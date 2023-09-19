@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Jonathan Good <jonathan@bungogood.com>"]
 description = "A Rust Backgammon library"
+documentation = "https://docs.rs/bkgm/latest/bkgm"
 readme = "README.md"
 repository = "https://github.com/bungogood/bkgm"
 license = "MIT"

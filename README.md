@@ -8,4 +8,5 @@ In the world of reinforcement learning, Backgammon has been influential, with Ne
 
 # References
 
+-   [Documentation](https://docs.rs/bkgm/latest/bkgm)
 -   Backgammon [Wikipedia](https://en.wikipedia.org/wiki/Backgammon)
