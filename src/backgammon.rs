@@ -80,7 +80,7 @@ impl Display for Action {
         let mut prev = steps.next().unwrap().clone();
 
         for step in steps {
-            if step.from == prev.to {
+            if step.from == prev.to && !prev.hit {
                 prev.to = step.to;
             } else {
                 write!(f, "{} ", prev)?;
@@ -99,9 +99,9 @@ pub struct Tree {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct State {
-    board: [i32; 24],
-    bar: (i32, i32),
-    off: (i32, i32),
+    board: [i8; 24],
+    bar: (i8, i8),
+    off: (i8, i8),
     is_white: bool,
 }
 
@@ -215,15 +215,11 @@ impl State {
                     to: to as usize,
                     hit: self.is_hit(to as usize),
                 };
-                let mut child = self.clone();
                 let mut children = Vec::new();
                 let next = if jump { self.next_point(from) } else { from };
-                child.apply_step(step);
-                lng = max(
-                    lng,
-                    child.rec_actions(&mut children, next, &dice[1..], jump),
-                );
-                // self.undo_step(step);
+                self.apply_step(step);
+                lng = max(lng, self.rec_actions(&mut children, next, &dice[1..], jump));
+                self.undo_step(step);
                 pap.push(Tree { step, children });
             }
         }
@@ -252,7 +248,7 @@ impl State {
             let mut prev = steps.next().unwrap().clone();
             let mut new_steps = Vec::new();
             for step in steps {
-                if step.from == prev.to {
+                if step.from == prev.to && !prev.hit {
                     prev.to = step.to;
                 } else {
                     new_steps.push(prev.clone());
@@ -304,7 +300,7 @@ impl State {
     }
 
     fn undo_step(&mut self, step: Step) {
-        if !self.is_white {
+        if self.is_white {
             if step.from == BAR {
                 self.bar.0 += 1;
             } else {
@@ -315,7 +311,7 @@ impl State {
                 self.off.0 -= 1;
             } else if step.hit {
                 self.board[step.to] = -1;
-                self.bar.1 += 1;
+                self.bar.1 -= 1;
             } else {
                 self.board[step.to] -= 1;
             }
@@ -345,13 +341,14 @@ impl State {
     }
 
     pub fn undo_action(&mut self, action: &Action) {
-        for step in &action.steps {
+        self.is_white = !self.is_white;
+        let steps = &action.steps.clone(); // TODO: Remove clone
+        for step in steps.iter().rev() {
             self.undo_step(*step);
         }
-        self.is_white = !self.is_white;
     }
 
-    fn flip(&self) -> State {
+    pub fn flip(&self) -> State {
         State {
             board: self
                 .board
@@ -369,7 +366,7 @@ impl State {
 
     pub fn decode(key: [u8; 10]) -> State {
         let mut bit_index = 0;
-        let mut board = [0i32; 24];
+        let mut board = [0i8; 24];
 
         let mut white_bar = 0;
         let mut black_bar = 0;
@@ -424,8 +421,8 @@ impl State {
         let mut bit_index = 0;
 
         let game = match self.is_white {
-            true => self.clone(),
-            false => self.flip(),
+            WHITE => self.clone(),
+            BLACK => self.flip(),
         };
 
         // Encoding the position for the player not on roll
@@ -500,7 +497,7 @@ impl State {
         println!("└12─11─10──9──8──7─┴───┴─6──5──4──3──2──1─┴───┘");
     }
 
-    fn print_point(value: i32, row: i32) {
+    fn print_point(value: i8, row: i8) {
         match (value, row) {
             (val, 4) if val.abs() > 5 => print!(" {} ", val.abs()),
             (val, _) if val > row => print!(" X "),

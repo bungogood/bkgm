@@ -1,2 +1,2 @@
 mod backgammon;
-pub use backgammon::State;
+pub use backgammon::{Action, State, Step};

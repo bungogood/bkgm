@@ -35,10 +35,9 @@ fn perft_rec(mut state: &mut State, depth: usize) -> usize {
 
     for roll in ROLLS {
         for action in state.possible_actions(roll) {
-            let mut child = state.clone();
-            child.apply_action(&action);
-            count += perft_rec(&mut child, depth - 1);
-            child.undo_action(&action);
+            state.apply_action(&action);
+            count += perft_rec(&mut state, depth - 1);
+            state.undo_action(&action);
         }
     }
 
@@ -52,10 +51,9 @@ fn perft(depth: usize) {
     for roll in ROLLS {
         let mut roll_count = 0;
         for action in state.possible_actions(roll) {
-            let mut child = state.clone();
-            child.apply_action(&action);
-            roll_count += perft_rec(&mut child, depth - 1);
-            child.undo_action(&action);
+            state.apply_action(&action);
+            roll_count += perft_rec(&mut state, depth - 1);
+            state.undo_action(&action);
         }
         count += roll_count;
         println!("{:?}: {}", roll, roll_count);
@@ -65,16 +63,5 @@ fn perft(depth: usize) {
 }
 
 fn main() {
-    let game = State::new();
-
-    game.display();
-
-    game.possible_actions((6, 6))
-        .iter()
-        .enumerate()
-        .for_each(|(index, action)| {
-            println!("{}: {}", index + 1, action);
-        });
-
-    perft(2)
+    perft(2);
 }
