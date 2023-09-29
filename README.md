@@ -10,3 +10,4 @@ In the world of reinforcement learning, Backgammon has been influential, with Ne
 
 -   [Documentation](https://docs.rs/bkgm/latest/bkgm)
 -   Backgammon [Wikipedia](https://en.wikipedia.org/wiki/Backgammon)
+-   [Wildbg](https://github.com/carsten-wenderdel/wildbg) by [Carsten Wenderdel](https://github.com/carsten-wenderdel/wildbg)
