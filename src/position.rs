@@ -12,8 +12,8 @@ use std::fmt::Write;
 use std::ops::Add;
 
 const NUM_CHECKERS: u8 = 15;
-pub(crate) const X_BAR: usize = 25;
-pub(crate) const O_BAR: usize = 0;
+pub const X_BAR: usize = 25;
+pub const O_BAR: usize = 0;
 
 pub const STARTING: Position = Position {
     pips: [
@@ -190,7 +190,7 @@ impl Position {
 
     pub fn position_id(&self) -> String {
         let key = self.encode();
-        let b64 = String::from(general_purpose::STANDARD.encode(&key));
+        let b64 = general_purpose::STANDARD.encode(key);
         b64[..14].to_string()
     }
 

@@ -10,12 +10,12 @@ pub enum Dice {
 /// Contains two different values between 1 and six. `big` is bigger than `small`.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct RegularDice {
-    pub(crate) big: usize,
-    pub(crate) small: usize,
+    pub big: usize,
+    pub small: usize,
 }
 
-pub(crate) const ALL_36: [Dice; 36] = Dice::all_36();
-pub(crate) const ALL_1296: [(Dice, Dice); 1296] = Dice::all_1296();
+pub const ALL_36: [Dice; 36] = Dice::all_36();
+pub const ALL_1296: [(Dice, Dice); 1296] = Dice::all_1296();
 
 impl fmt::Display for Dice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
