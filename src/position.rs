@@ -1,17 +1,15 @@
 mod double_moves;
 mod regular_moves;
-use base64::{engine::general_purpose, Engine as _};
-
 use crate::dice::Dice;
 use crate::position::GameResult::*;
 use crate::position::GameState::*;
+use base64::{engine::general_purpose, Engine as _};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Formatter;
 use std::fmt::Write;
-use std::ops::Add;
 
-const NUM_CHECKERS: u8 = 15;
+const NUM_CHECKERS: u8 = 3;
 pub const X_BAR: usize = 25;
 pub const O_BAR: usize = 0;
 
@@ -43,6 +41,24 @@ impl GameResult {
             LoseNormal => WinNormal,
             LoseGammon => WinGammon,
             LoseBg => WinBg,
+        }
+    }
+
+    pub fn is_win(&self) -> bool {
+        match self {
+            WinNormal | WinGammon | WinBg => true,
+            LoseNormal | LoseGammon | LoseBg => false,
+        }
+    }
+
+    pub fn value(&self) -> f32 {
+        match self {
+            WinNormal => 1.0,
+            WinGammon => 2.0,
+            WinBg => 3.0,
+            LoseNormal => -1.0,
+            LoseGammon => -2.0,
+            LoseBg => -3.0,
         }
     }
 }
@@ -94,7 +110,17 @@ pub struct Position {
 
 impl Position {
     pub fn new() -> Position {
-        STARTING
+        pos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2)
+    }
+
+    pub fn hypergammon() -> Position {
+        Position {
+            pips: [
+                0, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0,
+            ],
+            x_off: 0,
+            o_off: 0,
+        }
     }
 
     #[inline(always)]
@@ -128,10 +154,10 @@ impl Position {
 
     pub fn game_state(&self) -> GameState {
         debug_assert!(
-            self.x_off < 15 || self.o_off < 15,
+            self.x_off < NUM_CHECKERS || self.o_off < NUM_CHECKERS,
             "Not both sides can win at the same time"
         );
-        if self.x_off == 15 {
+        if self.x_off == NUM_CHECKERS {
             if self.o_off > 0 {
                 GameOver(WinNormal)
             } else if self.pips[O_BAR..7].iter().any(|pip| pip < &0) {
@@ -139,7 +165,7 @@ impl Position {
             } else {
                 GameOver(WinGammon)
             }
-        } else if self.o_off == 15 {
+        } else if self.o_off == NUM_CHECKERS {
             if self.x_off > 0 {
                 GameOver(LoseNormal)
             } else if self.pips[19..(X_BAR + 1)].iter().any(|pip| pip > &0) {
@@ -188,15 +214,65 @@ impl Position {
         Position::try_from(pips).expect("Need legal position")
     }
 
+    pub fn is_race(&self) -> bool {
+        false
+    }
+
     pub fn position_id(&self) -> String {
         let key = self.encode();
         let b64 = general_purpose::STANDARD.encode(key);
         b64[..14].to_string()
     }
 
-    pub fn from_id(id: String) -> Position {
-        let key = general_purpose::STANDARD.decode(id.add("==")).unwrap();
-        Position::decode(key.try_into().unwrap())
+    pub fn from_id(id: &String) -> Option<Position> {
+        let padded_id = format!("{}==", id);
+        let key = general_purpose::STANDARD.decode(padded_id).unwrap();
+        Some(Position::decode(key.try_into().unwrap()))
+    }
+
+    pub fn show(&self) {
+        println!("Position ID: {}", self.position_id());
+        println!("┌13─14─15─16─17─18─┬───┬19─20─21─22─23─24─┬───┐");
+        for row in 0..5 {
+            print!("│");
+            for point in 13..=24 {
+                Self::print_point(self.pips[point], row);
+                if point == 18 {
+                    print!("│");
+                    Self::print_point(self.o_bar() as i8, row);
+                    print!("│");
+                }
+            }
+            print!("│");
+            Self::print_point(self.o_off() as i8, row);
+            println!("│");
+        }
+        println!("│                  │BAR│                  │OFF│");
+        for row in (0..5).rev() {
+            print!("│");
+            for point in (1..=12).rev() {
+                if point == 6 {
+                    print!("│");
+                    Self::print_point(self.x_bar() as i8, row);
+                    print!("│");
+                }
+                Self::print_point(self.pips[point], row)
+            }
+            print!("│");
+            Self::print_point(self.x_off() as i8, row);
+            println!("│");
+        }
+        println!("└12─11─10──9──8──7─┴───┴─6──5──4──3──2──1─┴───┘");
+    }
+
+    fn print_point(value: i8, row: i8) {
+        match (value, row) {
+            (val, 4) if val.abs() > 9 => print!("{} ", val.abs()),
+            (val, 4) if val.abs() > 5 => print!(" {} ", val.abs()),
+            (val, _) if val > row => print!(" X "),
+            (val, _) if val < -row => print!(" O "),
+            _ => print!("   "),
+        }
     }
 }
 
@@ -434,6 +510,12 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
+    fn starting_pos() {
+        let p1 = pos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2);
+        assert_eq!(p1, STARTING);
+    }
+
+    #[test]
     fn x_off() {
         let given = pos! {x 3:15; o 1:1};
         assert_eq!(given.x_off(), 0);
@@ -668,7 +750,7 @@ mod tests {
             "zGbiIYCYD3gALA", // O off
         ];
         for pid in pids {
-            let game = super::Position::from_id(pid.to_string());
+            let game = super::Position::from_id(&pid.to_string()).unwrap();
             assert_eq!(pid, game.position_id());
         }
     }
@@ -676,7 +758,10 @@ mod tests {
 
 #[cfg(test)]
 mod private_tests {
-    use crate::position::{Position, O_BAR, STARTING};
+    use crate::{
+        position::{Position, O_BAR, STARTING},
+        Dice,
+    };
     use std::collections::HashMap;
 
     #[test]
@@ -770,5 +855,80 @@ mod private_tests {
     fn can_move_will_bear_off_skipping() {
         let given = pos!(x 4:10; o);
         assert!(given.can_move_in_board(4, 6));
+    }
+
+    #[test]
+    fn number_of_moves_for_various_positions_and_dice() {
+        // Thanks to Øystein for his test positions
+        let positions = [
+            ("4HPwATDgc/ABMA", (4, 4), 52),
+            ("4HPwATDgc/ABMA", (3, 1), 16),
+            ("4HPwATDgc/ABMA", (1, 3), 16),
+            ("0HPwATDgc/ABMA", (6, 4), 15),
+            ("0HPwATDgc/ABMA", (4, 6), 15),
+            ("4DnyATDgc/ABMA", (6, 4), 14),
+            ("4DnyATDgc/ABMA", (4, 6), 14),
+            ("AACAkCRJqqoAAA", (1, 1), 2220),
+            /* From The Bar */
+            ("4HPwATDgc/ABUA", (6, 6), 0),
+            ("4HPwATDgc/ABUA", (5, 6), 4),
+            ("4HPwATDgc/ABUA", (5, 2), 7),
+            ("0HPwATDgc/ABUA", (5, 2), 8),
+            ("4HPwATDgc/ABYA", (5, 2), 1),
+            ("sHPwATDgc/ABYA", (5, 2), 1),
+            ("hnPwATDgc/ABYA", (5, 2), 1),
+            ("sHPwATDgc/ABYA", (2, 2), 12),
+            ("sHPwATDgOfgAcA", (2, 2), 4),
+            ("sHPwATDgHHwAeA", (2, 2), 1),
+            ("sHPwATDgHDwAfA", (2, 2), 1),
+            ("sHPwATDgHDwAfA", (2, 1), 1),
+            ("sHPwATDgHDwAfA", (6, 1), 1),
+            ("xOfgATDgc/ABUA", (4, 3), 10),
+            ("lOfgATDgc/ABUA", (4, 3), 10),
+            /* Unable to play full roll */
+            ("sNvBATBw38ABMA", (6, 6), 1),
+            ("YNsWADZsuzsAAA", (6, 5), 1),
+            ("YNsWADNm7zkAAA", (6, 5), 1),
+            ("4BwcMBvgAYABAA", (4, 3), 1),
+            ("4DgcMBvgAYABAA", (4, 3), 1),
+            ("wAYAMBsAAAQAAA", (4, 3), 1),
+            ("GBsAmA0EACAAAA", (4, 3), 2),
+            ("MBsAsA0EACAAAA", (4, 3), 2),
+            /* Bearoff */
+            ("2G4bADDOAgAAAA", (5, 1), 2),
+            ("2G4bADDObgAAAA", (4, 2), 7),
+            ("AwAACAAAAAAAAA", (4, 2), 1),
+            ("AwAAYDsAAAAAAA", (6, 5), 1),
+            ("AwAAYDsAAAAAAA", (6, 2), 3),
+            ("2+4OAADs3hcAAA", (4, 3), 12),
+            ("tN0dAATb3AMAAA", (4, 2), 9),
+            ("tN0dAATb3AMAAA", (2, 2), 38),
+            ("2L07AAC274YAAA", (6, 5), 3),
+            ("2L07AAC23wYBAA", (6, 5), 2),
+            ("27ZFAAR7swEAAA", (6, 2), 4),
+            ("27ZFAAR7swEAAA", (2, 6), 4),
+            ("v0MChgK7HwgAAA", (5, 6), 1),
+            ("u20DAAP77hEAAA", (6, 3), 3),
+            ("u20DYAD77hEAAA", (6, 3), 3),
+        ];
+
+        fn number_of_moves(position: &Position, dice: &Dice) -> usize {
+            let all = position.all_positions_after_moving(dice);
+            if all.len() == 1 && all.first().unwrap().flip() == *position {
+                0
+            } else {
+                all.len()
+            }
+        }
+        for (id, dice, number) in positions {
+            let position = Position::from_id(&id.to_string()).unwrap();
+            let dice = Dice::new(dice.0, dice.1);
+            assert_eq!(
+                number_of_moves(&position, &dice),
+                number,
+                "failing position is {}",
+                id
+            );
+        }
     }
 }

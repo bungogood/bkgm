@@ -14,6 +14,8 @@ pub struct RegularDice {
     pub small: usize,
 }
 
+pub const ALL_SINGLES: [Dice; 15] = Dice::all_singles();
+pub const ALL_21: [(Dice, f32); 21] = Dice::all_21();
 pub const ALL_36: [Dice; 36] = Dice::all_36();
 pub const ALL_1296: [(Dice, Dice); 1296] = Dice::all_1296();
 
@@ -34,6 +36,46 @@ impl Dice {
         } else {
             Dice::Regular(RegularDice::new(die1, die2))
         }
+    }
+
+    /// Contains all 21 unique possibilities of dice.
+    const fn all_singles() -> [Dice; 15] {
+        let mut dice = [Dice::Double(1); 15]; // Dummy values, will be replaced
+
+        // for loops don't work with `const fn`
+        let mut count = 0;
+        let mut i = 0_usize;
+        while i < 6 {
+            let mut j = i + 1;
+            while j < 6 {
+                dice[count] = Dice::new(i + 1, j + 1);
+                j += 1;
+                count += 1;
+            }
+            i += 1;
+        }
+        dice
+    }
+
+    /// Contains all 21 unique possibilities of dice.
+    const fn all_21() -> [(Dice, f32); 21] {
+        let mut dice = [(Dice::Double(1), 0.0); 21]; // Dummy values, will be replaced
+
+        // for loops don't work with `const fn`
+        let mut count = 0;
+        let mut i = 0_usize;
+        while i < 6 {
+            dice[count] = (Dice::Double(i + 1), 1.0);
+            count += 1;
+            let mut j = i + 1;
+            while j < 6 {
+                dice[count] = (Dice::new(i + 1, j + 1), 2.0);
+                j += 1;
+                count += 1;
+            }
+            i += 1;
+        }
+        dice
     }
 
     /// Contains all 36 possibilities of dice. Regular dice will appear twice.
