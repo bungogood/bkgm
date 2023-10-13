@@ -24,10 +24,10 @@ pub const STARTING: Position = Position {
 pub enum GameResult {
     WinNormal,
     WinGammon,
-    WinBg,
+    WinBackgammon,
     LoseNormal,
     LoseGammon,
-    LoseBg,
+    LoseBackgammon,
 }
 
 impl GameResult {
@@ -36,17 +36,17 @@ impl GameResult {
         match self {
             WinNormal => LoseNormal,
             WinGammon => LoseGammon,
-            WinBg => LoseBg,
+            WinBackgammon => LoseBackgammon,
             LoseNormal => WinNormal,
             LoseGammon => WinGammon,
-            LoseBg => WinBg,
+            LoseBackgammon => WinBackgammon,
         }
     }
 
     pub fn is_win(&self) -> bool {
         match self {
-            WinNormal | WinGammon | WinBg => true,
-            LoseNormal | LoseGammon | LoseBg => false,
+            WinNormal | WinGammon | WinBackgammon => true,
+            LoseNormal | LoseGammon | LoseBackgammon => false,
         }
     }
 
@@ -54,10 +54,10 @@ impl GameResult {
         match self {
             WinNormal => 1.0,
             WinGammon => 2.0,
-            WinBg => 3.0,
+            WinBackgammon => 3.0,
             LoseNormal => -1.0,
             LoseGammon => -2.0,
-            LoseBg => -3.0,
+            LoseBackgammon => -3.0,
         }
     }
 }
@@ -131,7 +131,7 @@ pub trait State: Sized {
             if self.o_off() > 0 {
                 GameOver(WinNormal)
             } else if self.o_bar() > 0 || (1..=6).any(|pip| self.pip(pip) < 0) {
-                GameOver(WinBg)
+                GameOver(WinBackgammon)
             } else {
                 GameOver(WinGammon)
             }
@@ -139,7 +139,7 @@ pub trait State: Sized {
             if self.x_off() > 0 {
                 GameOver(LoseNormal)
             } else if self.x_bar() > 0 || (19..=24).any(|pip| self.pip(pip) > 0) {
-                GameOver(LoseBg)
+                GameOver(LoseBackgammon)
             } else {
                 GameOver(LoseGammon)
             }

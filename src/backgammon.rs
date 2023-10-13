@@ -138,15 +138,15 @@ mod backgammon_test {
     #[test]
     fn game_state_bg_when_on_bar() {
         let given = bpos!(x 25:1, 1:14; o);
-        assert_eq!(given.game_state(), GameOver(LoseBg));
-        assert_eq!(given.flip().game_state(), GameOver(LoseBg.reverse()));
+        assert_eq!(given.game_state(), GameOver(LoseBackgammon));
+        assert_eq!(given.flip().game_state(), GameOver(WinBackgammon));
     }
 
     #[test]
     fn game_state_bg_when_not_on_bar() {
         let given = bpos!(x 19:15; o);
-        assert_eq!(given.game_state(), GameOver(LoseBg));
-        assert_eq!(given.flip().game_state(), GameOver(LoseBg.reverse()));
+        assert_eq!(given.game_state(), GameOver(LoseBackgammon));
+        assert_eq!(given.flip().game_state(), GameOver(WinBackgammon));
     }
 
     #[test]
