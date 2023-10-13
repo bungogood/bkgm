@@ -9,7 +9,6 @@ use std::fmt;
 use std::fmt::Formatter;
 use std::fmt::Write;
 
-const NUM_CHECKERS: u8 = 3;
 pub const X_BAR: usize = 25;
 pub const O_BAR: usize = 0;
 
@@ -78,6 +77,7 @@ pub enum GameState {
 macro_rules! pos {
     ( x $( $x_pip:tt:$x_checkers:tt ), * ;o $( $o_pip:tt:$o_checkers:tt ), * ) => {
         {
+            use std::collections::HashMap;
             #[allow(unused_mut)]
             let mut x = HashMap::new();
             $(
@@ -95,32 +95,176 @@ macro_rules! pos {
     };
 }
 
+pub trait State: Sized {
+    const NUM_CHECKERS: u8;
+
+    fn new() -> Self;
+    fn from_position(position: Position) -> Self;
+
+    fn x_bar(&self) -> u8;
+    fn o_bar(&self) -> u8;
+    fn x_off(&self) -> u8;
+    fn o_off(&self) -> u8;
+    fn pip(&self, pip: usize) -> i8;
+    fn board(&self) -> [i8; 24];
+
+    fn position(&self) -> Position;
+    fn flip(&self) -> Self;
+
+    // fn possible_moves(&self, dice: &Dice) -> Vec<Move>;
+    fn possible_positions(&self, dice: &Dice) -> Vec<Self> {
+        debug_assert!(self.o_off() < Self::NUM_CHECKERS && self.x_off() < Self::NUM_CHECKERS);
+        let positions = self.position().all_positions_after_moving(dice);
+        positions
+            .into_iter()
+            .map(|p| Self::from_position(p))
+            .collect()
+    }
+    // fn phase(&self) -> Phase;
+
+    fn game_state(&self) -> GameState {
+        debug_assert!(
+            self.x_off() < Self::NUM_CHECKERS || self.o_off() < Self::NUM_CHECKERS,
+            "Not both sides can win at the same time"
+        );
+        if self.x_off() == Self::NUM_CHECKERS {
+            if self.o_off() > 0 {
+                GameOver(WinNormal)
+            } else if self.o_bar() > 0 || (1..=6).any(|pip| self.pip(pip) < 0) {
+                GameOver(WinBg)
+            } else {
+                GameOver(WinGammon)
+            }
+        } else if self.o_off() == Self::NUM_CHECKERS {
+            if self.x_off() > 0 {
+                GameOver(LoseNormal)
+            } else if self.x_bar() > 0 || (19..=24).any(|pip| self.pip(pip) > 0) {
+                GameOver(LoseBg)
+            } else {
+                GameOver(LoseGammon)
+            }
+        } else {
+            Ongoing
+        }
+    }
+
+    fn position_id(&self) -> String {
+        let key = self.encode();
+        let b64 = general_purpose::STANDARD.encode(key);
+        b64[..14].to_string()
+    }
+
+    fn from_id(id: &String) -> Option<Self> {
+        let padded_id = format!("{}==", id);
+        let key = general_purpose::STANDARD.decode(padded_id).unwrap();
+        Some(Self::decode(key.try_into().unwrap()))
+    }
+
+    fn dbhash(&self) -> usize;
+    fn show(&self) {
+        self.position().show();
+    }
+
+    fn encode(&self) -> [u8; 10] {
+        let mut key = [0u8; 10];
+        let mut bit_index = 0;
+
+        // Encoding the position for the player not on roll
+        for point in (1..=24).rev() {
+            for _ in 0..-self.pip(point) {
+                key[bit_index / 8] |= 1 << (bit_index % 8);
+                bit_index += 1; // Appending a 1
+            }
+            bit_index += 1; // Appending a 0
+        }
+        for _ in 0..self.o_bar() {
+            key[bit_index / 8] |= 1 << (bit_index % 8);
+            bit_index += 1; // Appending a 1
+        }
+        bit_index += 1; // Appending a 0
+
+        // Encoding the position for the player on roll
+        for point in 1..=24 {
+            for _ in 0..self.pip(point) {
+                key[bit_index / 8] |= 1 << (bit_index % 8);
+                bit_index += 1; // Appending a 1
+            }
+            bit_index += 1; // Appending a 0
+        }
+        for _ in 0..self.x_bar() {
+            key[bit_index / 8] |= 1 << (bit_index % 8);
+            bit_index += 1; // Appending a 1
+        }
+
+        key
+    }
+
+    fn decode(key: [u8; 10]) -> Self {
+        let mut bit_index = 0;
+        let mut pips = [0i8; 26];
+
+        let mut x_bar = 0;
+        let mut o_bar = 0;
+        let mut x_pieces = 0;
+        let mut o_pieces = 0;
+
+        for point in (0..24).rev() {
+            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
+                pips[point + 1] -= 1;
+                o_pieces += 1;
+                bit_index += 1;
+            }
+            bit_index += 1; // Appending a 0
+        }
+
+        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
+            o_bar += 1;
+            bit_index += 1;
+        }
+
+        bit_index += 1; // Appending a 0
+
+        for point in 0..24 {
+            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
+                pips[point + 1] += 1;
+                x_pieces += 1;
+                bit_index += 1;
+            }
+            bit_index += 1; // Appending a 0
+        }
+
+        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
+            x_bar += 1;
+            bit_index += 1;
+        }
+
+        pips[X_BAR] = x_bar;
+        pips[O_BAR] = -o_bar;
+
+        Self::from_position(Position {
+            pips: pips,
+            x_off: Self::NUM_CHECKERS - x_pieces - x_bar as u8,
+            o_off: Self::NUM_CHECKERS - o_pieces - o_bar as u8,
+        })
+    }
+}
+
 /// A single position in backgammon without match information.
 /// We assume two players "x" and "o".
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
     // Array positions 25 and 0 are the bar.
     // The other array positions are the pips from the point of view of x, moving from 24 to 0.
     // A positive number means x has that many checkers on that point. Negative for o.
     // Both x_off and o_off are never negative.
-    pips: [i8; 26],
-    x_off: u8,
-    o_off: u8,
+    pub pips: [i8; 26],
+    pub x_off: u8,
+    pub o_off: u8,
 }
 
 impl Position {
     pub fn new() -> Position {
         pos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2)
-    }
-
-    pub fn hypergammon() -> Position {
-        Position {
-            pips: [
-                0, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0,
-            ],
-            x_off: 0,
-            o_off: 0,
-        }
     }
 
     #[inline(always)]
@@ -148,39 +292,12 @@ impl Position {
     #[inline(always)]
     /// Will return positive value for checkers of `x`, negative value for checkers of `o`.
     pub fn pip(&self, pip: usize) -> i8 {
-        debug_assert!((1..=25).contains(&pip));
+        debug_assert!((1..=24).contains(&pip));
         self.pips[pip]
-    }
-
-    pub fn game_state(&self) -> GameState {
-        debug_assert!(
-            self.x_off < NUM_CHECKERS || self.o_off < NUM_CHECKERS,
-            "Not both sides can win at the same time"
-        );
-        if self.x_off == NUM_CHECKERS {
-            if self.o_off > 0 {
-                GameOver(WinNormal)
-            } else if self.pips[O_BAR..7].iter().any(|pip| pip < &0) {
-                GameOver(WinBg)
-            } else {
-                GameOver(WinGammon)
-            }
-        } else if self.o_off == NUM_CHECKERS {
-            if self.x_off > 0 {
-                GameOver(LoseNormal)
-            } else if self.pips[19..(X_BAR + 1)].iter().any(|pip| pip > &0) {
-                GameOver(LoseBg)
-            } else {
-                GameOver(LoseGammon)
-            }
-        } else {
-            Ongoing
-        }
     }
 
     /// The return values have switched the sides of the players.
     pub fn all_positions_after_moving(&self, dice: &Dice) -> Vec<Position> {
-        debug_assert!(self.o_off < NUM_CHECKERS && self.x_off < NUM_CHECKERS);
         let mut new_positions = match dice {
             Dice::Double(die) => self.all_positions_after_double_move(*die),
             Dice::Regular(dice) => self.all_positions_after_regular_move(dice),
@@ -244,7 +361,7 @@ impl Position {
                 }
             }
             print!("│");
-            Self::print_point(self.o_off() as i8, row);
+            Self::print_point(-(self.o_off() as i8), row);
             println!("│");
         }
         println!("│                  │BAR│                  │OFF│");
@@ -307,10 +424,8 @@ impl TryFrom<[i8; 26]> for Position {
 
 impl fmt::Debug for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Position:").unwrap();
-
         // Write x:
-        let mut s = String::from("x: {");
+        let mut s = String::from("x ");
         if self.pips[X_BAR] > 0 {
             write!(s, "bar:{}, ", self.pips[X_BAR]).unwrap();
         }
@@ -324,11 +439,10 @@ impl fmt::Debug for Position {
         }
         s.pop(); // remove last ", "
         s.pop();
-        writeln!(s, "}}").unwrap();
-        write!(f, "{}", s).unwrap();
+        write!(f, "({} ", s).unwrap();
 
         // Write o:
-        let mut s = String::from("o: {");
+        let mut s = String::from("o ");
         if self.o_off > 0 {
             write!(s, "off:{}, ", self.o_off).unwrap();
         }
@@ -342,8 +456,7 @@ impl fmt::Debug for Position {
         }
         s.pop(); // remove last ", "
         s.pop();
-        write!(s, "}}").unwrap();
-        write!(f, "{}", s)
+        write!(f, "{})", s)
     }
 }
 
@@ -548,41 +661,6 @@ mod tests {
     }
 
     #[test]
-    fn game_state_bg_when_on_bar() {
-        let given = pos!(x 25:1, 1:14; o);
-        assert_eq!(given.game_state(), GameOver(LoseBg));
-        assert_eq!(given.flip().game_state(), GameOver(LoseBg.reverse()));
-    }
-
-    #[test]
-    fn game_state_bg_when_not_on_bar() {
-        let given = pos!(x 19:15; o);
-        assert_eq!(given.game_state(), GameOver(LoseBg));
-        assert_eq!(given.flip().game_state(), GameOver(LoseBg.reverse()));
-    }
-
-    #[test]
-    fn game_state_gammon() {
-        let given = pos!(x 18:15; o);
-        assert_eq!(given.game_state(), GameOver(LoseGammon));
-        assert_eq!(given.flip().game_state(), GameOver(LoseGammon.reverse()));
-    }
-
-    #[test]
-    fn game_state_normal() {
-        let given = pos!(x 19:14; o);
-        assert_eq!(given.game_state(), GameOver(LoseNormal));
-        assert_eq!(given.flip().game_state(), GameOver(LoseNormal.reverse()));
-    }
-
-    #[test]
-    fn game_state_ongoing() {
-        let given = pos!(x 19:14; o 1:4);
-        assert_eq!(given.game_state(), Ongoing);
-        assert_eq!(given.flip().game_state(), Ongoing);
-    }
-
-    #[test]
     fn all_positions_after_moving_double() {
         // Given
         let pos = pos!(x X_BAR:2, 4:1, 3:1; o 24:2);
@@ -730,7 +808,7 @@ mod tests {
     #[test]
     fn debug() {
         let actual = format!("{:?}", pos!(x X_BAR:2, 3:5, 1:1; o 24:7, 23:4, O_BAR:3),);
-        let expected = "Position:\nx: {bar:2, 3:5, 1:1, off:7}\no: {off:1, 24:7, 23:4, bar:3}";
+        let expected = "(x bar:2, 3:5, 1:1, off:7 o off:1, 24:7, 23:4, bar:3)";
         assert_eq!(actual, expected);
     }
 
