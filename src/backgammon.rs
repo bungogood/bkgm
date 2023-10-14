@@ -1,9 +1,16 @@
+use crate::bpos;
 use crate::position::{Position, State};
-use crate::{bpos, Dice};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Backgammon {
     position: Position,
+}
+
+impl Backgammon {
+    pub fn from_macro(pips: [i8; 26], x_off: u8, o_off: u8) -> Self {
+        let position = Position { pips, x_off, o_off };
+        Self::from_position(position)
+    }
 }
 
 impl State for Backgammon {
@@ -74,7 +81,6 @@ impl State for Backgammon {
 macro_rules! bpos {
     ( x $( $x_pip:tt : $x_checkers:tt ), * ;o $( $o_pip:tt : $o_checkers:tt ), * ) => {
         {
-            use crate::position::Position;
             let mut pips = [0; 26];
             let mut x_pieces = 0;
             let mut o_pieces = 0;
@@ -92,13 +98,8 @@ macro_rules! bpos {
             let x_off = 15 - x_pieces;
             let o_off = 15 - o_pieces;
 
-            let position = Position {
-                pips,
-                x_off,
-                o_off,
-            };
 
-            Backgammon::from_position(position)
+            Backgammon::from_macro(pips, x_off, o_off)
         }
     };
 }

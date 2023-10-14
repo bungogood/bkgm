@@ -1,10 +1,17 @@
+use crate::hpos;
 use crate::position::{Position, State};
 use crate::utils::mcomb;
-use crate::{hpos, Dice};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Hypergammon {
     position: Position,
+}
+
+impl Hypergammon {
+    pub fn from_macro(pips: [i8; 26], x_off: u8, o_off: u8) -> Self {
+        let position = Position { pips, x_off, o_off };
+        Self::from_position(position)
+    }
 }
 
 impl State for Hypergammon {
@@ -101,7 +108,6 @@ impl State for Hypergammon {
 macro_rules! hpos {
     ( x $( $x_pip:tt : $x_checkers:tt ), * ;o $( $o_pip:tt : $o_checkers:tt ), * ) => {
         {
-            use crate::position::Position;
             #[allow(unused_mut)]
             let mut pips = [0; 26];
             let mut x_pieces = 0;
@@ -120,13 +126,7 @@ macro_rules! hpos {
             let x_off = 3 - x_pieces;
             let o_off = 3 - o_pieces;
 
-            let position = Position {
-                pips,
-                x_off,
-                o_off,
-            };
-
-            Hypergammon::from_position(position)
+            Hypergammon::from_macro(pips, x_off, o_off)
         }
     };
 }

@@ -95,7 +95,7 @@ macro_rules! pos {
     };
 }
 
-pub trait State: Sized {
+pub trait State: Sized + Sync + Clone + Copy + PartialEq + Eq + fmt::Debug {
     const NUM_CHECKERS: u8;
 
     fn new() -> Self;
