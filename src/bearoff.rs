@@ -1,0 +1,3 @@
+struct RacePos {
+    // 7
+}

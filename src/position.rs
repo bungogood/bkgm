@@ -68,6 +68,19 @@ pub enum GameState {
     GameOver(GameResult),
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Phase {
+    Contact,
+    Race,
+    // Bearoff,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum GamePhase {
+    Ongoing(Phase),
+    GameOver(GameResult),
+}
+
 /// Simple way to create positions for testing
 /// The starting position would be:
 /// pos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2)
@@ -120,7 +133,13 @@ pub trait State: Sized + Sync + Clone + Copy + PartialEq + Eq + fmt::Debug {
             .map(|p| Self::from_position(p))
             .collect()
     }
-    // fn phase(&self) -> Phase;
+
+    fn phase(&self) -> GamePhase {
+        match self.game_state() {
+            GameOver(result) => GamePhase::GameOver(result),
+            Ongoing => GamePhase::Ongoing(self.position().phase()),
+        }
+    }
 
     fn game_state(&self) -> GameState {
         debug_assert!(
@@ -294,6 +313,26 @@ impl Position {
     pub fn pip(&self, pip: usize) -> i8 {
         debug_assert!((1..=24).contains(&pip));
         self.pips[pip]
+    }
+
+    pub fn phase(&self) -> Phase {
+        // The index of my checker which is closest to pip 24
+        let last_own_checker = self
+            .pips
+            .iter()
+            .rposition(|&p| p > 0)
+            .expect("There must be a checker on a pip, otherwise the game is over");
+        // The index of opponent's checker which is closest to 1
+        let last_opponent_checker = self
+            .pips
+            .iter()
+            .position(|&p| p < 0)
+            .expect("There must be a checker on a pip, otherwise the game is over");
+        if last_own_checker > last_opponent_checker {
+            Phase::Contact
+        } else {
+            Phase::Race
+        }
     }
 
     /// The return values have switched the sides of the players.
