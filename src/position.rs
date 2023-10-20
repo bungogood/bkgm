@@ -180,8 +180,50 @@ pub trait State: Sized + Sync + Clone + Copy + PartialEq + Eq + fmt::Debug {
     }
 
     fn dbhash(&self) -> usize;
+
     fn show(&self) {
-        self.position().show();
+        println!("Position ID: {}", self.position_id());
+        println!("┌13─14─15─16─17─18─┬───┬19─20─21─22─23─24─┬───┐");
+        for row in 0..5 {
+            print!("│");
+            for point in 13..=24 {
+                Self::print_point(self.pip(point), row);
+                if point == 18 {
+                    print!("│");
+                    Self::print_point(-(self.o_bar() as i8), row);
+                    print!("│");
+                }
+            }
+            print!("│");
+            Self::print_point(-(self.o_off() as i8), row);
+            println!("│");
+        }
+        println!("│                  │BAR│                  │OFF│");
+        for row in (0..5).rev() {
+            print!("│");
+            for point in (1..=12).rev() {
+                if point == 6 {
+                    print!("│");
+                    Self::print_point(self.x_bar() as i8, row);
+                    print!("│");
+                }
+                Self::print_point(self.pip(point), row)
+            }
+            print!("│");
+            Self::print_point(self.x_off() as i8, row);
+            println!("│");
+        }
+        println!("└12─11─10──9──8──7─┴───┴─6──5──4──3──2──1─┴───┘");
+    }
+
+    fn print_point(value: i8, row: i8) {
+        match (value, row) {
+            (val, 4) if val.abs() > 9 => print!("{} ", val.abs()),
+            (val, 4) if val.abs() > 5 => print!(" {} ", val.abs()),
+            (val, _) if val > row => print!(" X "),
+            (val, _) if val < -row => print!(" O "),
+            _ => print!("   "),
+        }
     }
 
     fn encode(&self) -> [u8; 10] {
@@ -369,67 +411,6 @@ impl Position {
         }
         Position::try_from(pips).expect("Need legal position")
     }
-
-    pub fn is_race(&self) -> bool {
-        false
-    }
-
-    pub fn position_id(&self) -> String {
-        let key = self.encode();
-        let b64 = general_purpose::STANDARD.encode(key);
-        b64[..14].to_string()
-    }
-
-    pub fn from_id(id: &String) -> Option<Position> {
-        let padded_id = format!("{}==", id);
-        let key = general_purpose::STANDARD.decode(padded_id).unwrap();
-        Some(Position::decode(key.try_into().unwrap()))
-    }
-
-    pub fn show(&self) {
-        println!("Position ID: {}", self.position_id());
-        println!("┌13─14─15─16─17─18─┬───┬19─20─21─22─23─24─┬───┐");
-        for row in 0..5 {
-            print!("│");
-            for point in 13..=24 {
-                Self::print_point(self.pips[point], row);
-                if point == 18 {
-                    print!("│");
-                    Self::print_point(self.o_bar() as i8, row);
-                    print!("│");
-                }
-            }
-            print!("│");
-            Self::print_point(-(self.o_off() as i8), row);
-            println!("│");
-        }
-        println!("│                  │BAR│                  │OFF│");
-        for row in (0..5).rev() {
-            print!("│");
-            for point in (1..=12).rev() {
-                if point == 6 {
-                    print!("│");
-                    Self::print_point(self.x_bar() as i8, row);
-                    print!("│");
-                }
-                Self::print_point(self.pips[point], row)
-            }
-            print!("│");
-            Self::print_point(self.x_off() as i8, row);
-            println!("│");
-        }
-        println!("└12─11─10──9──8──7─┴───┴─6──5──4──3──2──1─┴───┘");
-    }
-
-    fn print_point(value: i8, row: i8) {
-        match (value, row) {
-            (val, 4) if val.abs() > 9 => print!("{} ", val.abs()),
-            (val, 4) if val.abs() > 5 => print!(" {} ", val.abs()),
-            (val, _) if val > row => print!(" X "),
-            (val, _) if val < -row => print!(" O "),
-            _ => print!("   "),
-        }
-    }
 }
 
 impl TryFrom<[i8; 26]> for Position {
@@ -569,89 +550,6 @@ impl Position {
             Some(self.clone_and_move_single_checker(from, die))
         } else {
             None
-        }
-    }
-
-    fn encode(&self) -> [u8; 10] {
-        let mut key = [0u8; 10];
-        let mut bit_index = 0;
-
-        // Encoding the position for the player not on roll
-        for point in (1..=24).rev() {
-            for _ in 0..-self.pips[point] {
-                key[bit_index / 8] |= 1 << (bit_index % 8);
-                bit_index += 1; // Appending a 1
-            }
-            bit_index += 1; // Appending a 0
-        }
-        for _ in 0..self.pips[O_BAR] {
-            key[bit_index / 8] |= 1 << (bit_index % 8);
-            bit_index += 1; // Appending a 1
-        }
-        bit_index += 1; // Appending a 0
-
-        // Encoding the position for the player on roll
-        for point in 1..=24 {
-            for _ in 0..self.pips[point] {
-                key[bit_index / 8] |= 1 << (bit_index % 8);
-                bit_index += 1; // Appending a 1
-            }
-            bit_index += 1; // Appending a 0
-        }
-        for _ in 0..self.pips[X_BAR] {
-            key[bit_index / 8] |= 1 << (bit_index % 8);
-            bit_index += 1; // Appending a 1
-        }
-
-        key
-    }
-
-    fn decode(key: [u8; 10]) -> Position {
-        let mut bit_index = 0;
-        let mut pips = [0i8; 26];
-
-        let mut x_bar = 0;
-        let mut o_bar = 0;
-        let mut x_pieces = 0;
-        let mut o_pieces = 0;
-
-        for point in (0..24).rev() {
-            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-                pips[point + 1] -= 1;
-                o_pieces += 1;
-                bit_index += 1;
-            }
-            bit_index += 1; // Appending a 0
-        }
-
-        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-            o_bar += 1;
-            bit_index += 1;
-        }
-
-        bit_index += 1; // Appending a 0
-
-        for point in 0..24 {
-            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-                pips[point + 1] += 1;
-                x_pieces += 1;
-                bit_index += 1;
-            }
-            bit_index += 1; // Appending a 0
-        }
-
-        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-            x_bar += 1;
-            bit_index += 1;
-        }
-
-        pips[X_BAR] = x_bar;
-        pips[O_BAR] = -o_bar;
-
-        Position {
-            pips: pips,
-            x_off: (15 - x_pieces - x_bar) as u8,
-            o_off: (15 - o_pieces - o_bar) as u8,
         }
     }
 }

@@ -81,17 +81,18 @@ impl State for Hypergammon {
         } else {
             0
         };
-        for (i, &n) in self.position.pips.iter().skip(1).enumerate() {
+        for i in 1..=24 {
+            let n = self.position.pip(i);
             if n > 0 {
                 x_remaining -= n as usize;
             } else if n < 0 {
                 o_remaining -= n.abs() as usize;
             }
             if o_remaining > 0 {
-                o_index += mcomb(points - 1 - i, o_remaining - 1);
+                o_index += mcomb(points - i, o_remaining - 1);
             }
             if x_remaining > 0 {
-                x_index += mcomb(points - 1 - i, x_remaining - 1);
+                x_index += mcomb(points - i, x_remaining - 1);
             }
         }
         x_index * mcomb(points, 3) + o_index
