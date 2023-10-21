@@ -83,10 +83,10 @@ impl State for Hypergammon {
         };
         for i in 1..=24 {
             let n = self.position.pip(i);
-            if n > 0 {
-                x_remaining -= n as usize;
-            } else if n < 0 {
-                o_remaining -= n.abs() as usize;
+            match n {
+                n if n < 0 => o_remaining -= n.unsigned_abs() as usize,
+                n if n > 0 => x_remaining -= n as usize,
+                _ => {}
             }
             if o_remaining > 0 {
                 o_index += mcomb(points - i, o_remaining - 1);

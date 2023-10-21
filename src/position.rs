@@ -295,7 +295,7 @@ pub trait State: Sized + Sync + Clone + Copy + PartialEq + Eq + fmt::Debug {
         pips[O_BAR] = -o_bar;
 
         Self::from_position(Position {
-            pips: pips,
+            pips,
             x_off: Self::NUM_CHECKERS - x_pieces - x_bar as u8,
             o_off: Self::NUM_CHECKERS - o_pieces - o_bar as u8,
         })
@@ -316,10 +316,6 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn new() -> Position {
-        pos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2)
-    }
-
     #[inline(always)]
     pub fn x_off(&self) -> u8 {
         self.x_off
@@ -494,7 +490,7 @@ impl Position {
 
     /// Only call if this move is legal.
     fn clone_and_move_single_checker(&self, from: usize, die: usize) -> Position {
-        let mut new = self.clone();
+        let mut new = *self;
         new.move_single_checker(from, die);
         new
     }
@@ -528,6 +524,7 @@ impl Position {
         };
     }
 
+    #[allow(dead_code)]
     /// Works for all of moves, including those from the bar
     fn can_move(&self, from: usize, die: usize) -> bool {
         if (from == X_BAR) == (self.pips[X_BAR] > 0) {
@@ -537,6 +534,7 @@ impl Position {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn try_move_single_checker(&self, from: usize, die: usize) -> Option<Position> {
         if self.can_move(from, die) {
             Some(self.clone_and_move_single_checker(from, die))
