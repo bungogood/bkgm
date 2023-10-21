@@ -4,7 +4,6 @@ use crate::dice::Dice;
 use crate::position::GameResult::*;
 use crate::position::GameState::*;
 use base64::{engine::general_purpose, Engine as _};
-use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Formatter;
 use std::fmt::Write;
@@ -80,22 +79,19 @@ pub enum GamePhase {
 /// pos!(x 24:2, 13:5, 8:3, 6:5; o 1:2, 12:5, 17:3, 19:5)
 #[macro_export]
 macro_rules! pos {
-    ( x $( $x_pip:tt:$x_checkers:tt ), * ;o $( $o_pip:tt:$o_checkers:tt ), * ) => {
+    ( x $( $x_pip:tt : $x_checkers:tt ), * ;o $( $o_pip:tt : $o_checkers:tt ), * ) => {
         {
-            use std::collections::HashMap;
             #[allow(unused_mut)]
-            let mut x = HashMap::new();
-            $(
-                x.insert($x_pip as usize, $x_checkers as u8);
-            )*
+            let mut pips = [0; 26];
 
-            #[allow(unused_mut)]
-            let mut o = HashMap::new();
-            $(
-                o.insert($o_pip as usize, $o_checkers as u8);
-            )*
+            $(pips[$x_pip as usize] = $x_checkers as i8;)*
+            $(pips[$o_pip as usize] = -$o_checkers as i8;)*
 
-            Position::from(&x, &o)
+            Position {
+                pips,
+                x_off: 0,
+                o_off: 0,
+            }
         }
     };
 }
@@ -386,18 +382,6 @@ impl Position {
             x_off: self.o_off,
             o_off: self.x_off,
         }
-    }
-
-    pub fn from(x: &HashMap<usize, u8>, o: &HashMap<usize, u8>) -> Position {
-        let mut pips = [0; 26];
-        for (i, v) in x {
-            pips[*i] = *v as i8;
-        }
-        for (i, v) in o {
-            debug_assert!(pips[*i] == 0);
-            pips[*i] = -(*v as i8);
-        }
-        Position::try_from(pips).expect("Need legal position")
     }
 }
 
@@ -734,7 +718,7 @@ mod tests {
     #[test]
     fn debug() {
         let actual = format!("{:?}", pos!(x X_BAR:2, 3:5, 1:1; o 24:7, 23:4, O_BAR:3),);
-        let expected = "(x bar:2, 3:5, 1:1, off:7 o off:1, 24:7, 23:4, bar:3)";
+        let expected = "(x bar:2, 3:5, 1:1 o 24:7, 23:4, bar:3)";
         assert_eq!(actual, expected);
     }
 
@@ -794,17 +778,17 @@ mod private_tests {
 
     #[test]
     fn move_single_checker_bearoff_regular() {
-        let before = pos!(x 4:10; o);
+        let before = bpos!(x 4:10; o).position();
         let actual = before.clone_and_move_single_checker(4, 4);
-        let expected = pos!(x 4:9; o);
+        let expected = bpos!(x 4:9; o).position();
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn move_single_checker_bearoff_from_lower_pip() {
-        let before = pos!(x 4:10; o);
+        let before = bpos!(x 4:10; o).position();
         let actual = before.clone_and_move_single_checker(4, 5);
-        let expected = pos!(x 4:9; o);
+        let expected = bpos!(x 4:9; o).position();
         assert_eq!(actual, expected);
     }
 

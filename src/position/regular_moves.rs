@@ -265,8 +265,8 @@ enum MovePossibilities {
 #[cfg(test)]
 mod tests {
     use crate::dice::RegularDice;
-    use crate::pos;
     use crate::position::{Position, O_BAR, X_BAR};
+    use crate::{bpos, pos, Backgammon, State};
 
     // Two checkers on bar
 
@@ -456,12 +456,12 @@ mod tests {
     #[test]
     fn forced_smaller_die_first_then_bear_off() {
         // Given
-        let position = pos!(x 8:1, 4:3; o 1:2);
+        let position = bpos!(x 8:1, 4:3; o 1:2).position();
         // When
         let resulting_positions =
             position.all_positions_after_regular_move(&RegularDice::new(4, 3));
         // Then
-        let expected = pos!(x 5:1, 4:2; o 1:2);
+        let expected = bpos!(x 5:1, 4:2; o 1:2).position();
         assert_eq!(resulting_positions, vec![expected]);
     }
 
@@ -480,31 +480,31 @@ mod tests {
     #[test]
     fn smaller_first_allows_bear_off() {
         // Given
-        let position = pos!(x 9:1, 5:1; o 20:2);
+        let position = bpos!(x 9:1, 5:1; o 20:2).position();
         // When
         let resulting_positions =
             position.all_positions_after_regular_move(&RegularDice::new(5, 3));
         // Then
-        let expected1 = pos!(x 4:1, 2:1; o 20:2);
-        let expected2 = pos!(x 5:1, 1:1; o 20:2);
-        let expected3 = pos!(x 6:1; o 20:2);
+        let expected1 = bpos!(x 4:1, 2:1; o 20:2).position();
+        let expected2 = bpos!(x 5:1, 1:1; o 20:2).position();
+        let expected3 = bpos!(x 6:1; o 20:2).position();
         assert_eq!(resulting_positions, vec![expected1, expected2, expected3]);
     }
 
     #[test]
     fn could_bear_off_but_could_do_other_moves_as_well() {
         // Given
-        let position = pos!(x 5:2, 4:3, 3:1; o 20:1);
+        let position = bpos!(x 5:2, 4:3, 3:1; o 20:1).position();
         // When
         let resulting_positions =
             position.all_positions_after_regular_move(&RegularDice::new(4, 3));
         // Then
-        let expected1 = pos!(x 4:3, 3:1, 2:1, 1:1; o 20:1);
-        let expected2 = pos!(x 5:1, 4:2, 3:1, 1:2; o 20:1);
-        let expected3 = pos!(x 5:1, 4:3, 1:1; o 20:1);
-        let expected4 = pos!(x 5:1, 4:2, 3:1, 2:1; o 20:1);
-        let expected5 = pos!(x 5:2, 4:1, 3:1, 1:1; o 20:1);
-        let expected6 = pos!(x 5:2, 4:2; o 20:1);
+        let expected1 = bpos!(x 4:3, 3:1, 2:1, 1:1; o 20:1).position();
+        let expected2 = bpos!(x 5:1, 4:2, 3:1, 1:2; o 20:1).position();
+        let expected3 = bpos!(x 5:1, 4:3, 1:1; o 20:1).position();
+        let expected4 = bpos!(x 5:1, 4:2, 3:1, 2:1; o 20:1).position();
+        let expected5 = bpos!(x 5:2, 4:1, 3:1, 1:1; o 20:1).position();
+        let expected6 = bpos!(x 5:2, 4:2; o 20:1).position();
         assert_eq!(
             resulting_positions,
             vec![expected1, expected2, expected3, expected4, expected5, expected6]
@@ -564,25 +564,25 @@ mod tests {
     #[test]
     fn two_bear_offs_from_same_pip() {
         // Given
-        let position = pos!(x 1:5; o 24:8);
+        let position = bpos!(x 1:5; o 24:8).position();
         // When
         let resulting_positions =
             position.all_positions_after_regular_move(&RegularDice::new(6, 4));
         // Then
-        let expected = pos!(x 1:3; o 24:8);
+        let expected = bpos!(x 1:3; o 24:8).position();
         assert_eq!(resulting_positions, vec![expected]);
     }
 
     #[test]
     fn bear_off_from_same_pip_with_either_big_or_small_die() {
         // Given
-        let position = pos!(x 2:1, 1:5; o);
+        let position = bpos!(x 2:1, 1:5; o).position();
         // When
         let resulting_positions =
             position.all_positions_after_regular_move(&RegularDice::new(6, 1));
         // Then
-        let expected1 = pos!(x 1:4; o);
-        let expected2 = pos!(x 1:5; o);
+        let expected1 = bpos!(x 1:4; o).position();
+        let expected2 = bpos!(x 1:5; o).position();
         assert_eq!(resulting_positions, vec![expected1, expected2]);
     }
 

@@ -39,6 +39,7 @@ Position ID: 4HPwATDgc/ABMA
 -   Improve test coverage.
 -   Add a game trait, enabling Mat files.
 -   Addition of optional rules
+-   Improve macros to work with bar and off
 
 ## References
 

@@ -108,8 +108,8 @@ impl Position {
 
 #[cfg(test)]
 mod tests {
-    use crate::pos;
     use crate::position::{Position, O_BAR, X_BAR};
+    use crate::{bpos, pos, Backgammon, State};
 
     #[test]
     fn cannot_enter_from_the_bar() {
@@ -159,14 +159,14 @@ mod tests {
     #[test]
     fn bearoff_4_or_bearoff_less() {
         // Given
-        let position = pos!(x 4:1, 3:1, 2:4; o 22:2);
+        let position = bpos!(x 4:1, 3:1, 2:4; o 22:2).position();
         // When
         let resulting_positions = position.all_positions_after_double_move(2);
         // Then
-        let expected1 = pos!(x 2:3, 1:1; o 22:2);
-        let expected2 = pos!(x 3:1, 2:2; o 22:2);
-        let expected3 = pos!(x 4:1, 2:1, 1:1; o 22:2);
-        let expected4 = pos!(x 4:1, 3:1; o 22:2);
+        let expected1 = bpos!(x 2:3, 1:1; o 22:2).position();
+        let expected2 = bpos!(x 3:1, 2:2; o 22:2).position();
+        let expected3 = bpos!(x 4:1, 2:1, 1:1; o 22:2).position();
+        let expected4 = bpos!(x 4:1, 3:1; o 22:2).position();
         assert_eq!(
             resulting_positions,
             vec![expected1, expected2, expected3, expected4],
