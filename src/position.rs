@@ -12,14 +12,6 @@ use std::fmt::Write;
 pub const X_BAR: usize = 25;
 pub const O_BAR: usize = 0;
 
-pub const STARTING: Position = Position {
-    pips: [
-        0, -2, 0, 0, 0, 0, 5, 0, 3, 0, 0, 0, -5, 5, 0, 0, 0, -3, 0, -5, 0, 0, 0, 0, 2, 0,
-    ],
-    x_off: 0,
-    o_off: 0,
-};
-
 #[derive(Debug, PartialEq)]
 pub enum GameResult {
     WinNormal,
@@ -556,68 +548,67 @@ impl Position {
 
 #[cfg(test)]
 mod tests {
-    use crate::position::*;
-    use std::collections::HashMap;
+    use crate::{bpos, Backgammon, Dice, Position, State, O_BAR, X_BAR};
 
     #[test]
     fn starting_pos() {
-        let p1 = pos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2);
-        assert_eq!(p1, STARTING);
+        let p1 = bpos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2);
+        assert_eq!(p1, Backgammon::new());
     }
 
     #[test]
     fn x_off() {
-        let given = pos! {x 3:15; o 1:1};
+        let given = bpos! {x 3:15; o 1:1};
         assert_eq!(given.x_off(), 0);
-        let given = pos! {x 3:10; o 1:1};
+        let given = bpos! {x 3:10; o 1:1};
         assert_eq!(given.x_off(), 5);
     }
 
     #[test]
     fn o_off() {
-        let given = pos! {x 1:1; o 3:15};
+        let given = bpos! {x 1:1; o 3:15};
         assert_eq!(given.o_off(), 0);
-        let given = pos! {x 1:1; o 3:10};
+        let given = bpos! {x 1:1; o 3:10};
         assert_eq!(given.o_off(), 5);
     }
 
     #[test]
     fn x_bar() {
-        let given = pos! {x 3:15; o 1:1};
+        let given = bpos! {x 3:15; o 1:1};
         assert_eq!(given.x_bar(), 0);
-        let given = pos! {x X_BAR:2, 3:10; o 1:1};
+        let given = bpos! {x X_BAR:2, 3:10; o 1:1};
         assert_eq!(given.x_bar(), 2);
     }
 
     #[test]
     fn o_bar() {
-        let given = pos! {x 1:1; o 3:15};
+        let given = bpos! {x 1:1; o 3:15};
         assert_eq!(given.o_bar(), 0);
-        let given = pos! {x 1:1; o 3:10, O_BAR:1};
+        let given = bpos! {x 1:1; o 3:10, O_BAR:1};
         assert_eq!(given.o_bar(), 1);
     }
 
     #[test]
     fn all_positions_after_moving_double() {
         // Given
-        let pos = pos!(x X_BAR:2, 4:1, 3:1; o 24:2);
+        let pos = bpos!(x X_BAR:2, 4:1, 3:1; o 24:2);
         // When
-        let positions = pos.all_positions_after_moving(&Dice::new(3, 3));
+        let positions = pos.possible_positions(&Dice::new(3, 3));
         // Then
-        let expected1 = pos!(x 1:2; o 6:2, 21:1, 22:1);
-        let expected2 = pos!(x 1:2; o 3:1, 9:1, 21:1, 22:1);
-        let expected3 = pos!(x 1:2; o 3:1, 6:1, 22:1, 24:1);
+        let expected1 = bpos!(x 1:2; o 6:2, 21:1, 22:1);
+        let expected2 = bpos!(x 1:2; o 3:1, 9:1, 21:1, 22:1);
+        let expected3 = bpos!(x 1:2; o 3:1, 6:1, 22:1, 24:1);
         assert_eq!(positions, [expected1, expected2, expected3]);
     }
 
     #[test]
     fn all_positions_after_moving_regular() {
-        let pos = pos!(x X_BAR:1; o 22:1);
+        let pos = bpos!(x X_BAR:1; o 22:1);
         // When
-        let positions = pos.all_positions_after_moving(&Dice::new(2, 3));
+        let positions = pos.possible_positions(&Dice::new(2, 3));
         // Then
-        let expected1 = pos!(x X_BAR:1; o 5:1);
-        let expected2 = pos!(x 3:1; o 5:1);
+        let expected1 = bpos!(x X_BAR:1; o 5:1);
+        let expected2 = bpos!(x 3:1; o 5:1);
         assert_eq!(positions, [expected1, expected2]);
     }
 
@@ -647,14 +638,14 @@ mod tests {
 
     #[test]
     fn from() {
-        let actual = pos!(x X_BAR:2, 3:2, 1:1; o 24:5, 23:4, 22:6);
-        let expected = Position {
+        let actual = bpos!(x X_BAR:2, 3:2, 1:1; o 24:5, 23:4, 22:6);
+        let expected = Backgammon::from_position(Position {
             pips: [
                 0, 1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -6, -4, -5, 2,
             ],
             x_off: 10,
             o_off: 0,
-        };
+        });
         assert_eq!(actual, expected);
     }
 
@@ -751,7 +742,7 @@ mod tests {
 
     #[test]
     fn start_id() {
-        let game = super::Position::new();
+        let game = Backgammon::new();
         let id = game.position_id();
         assert_eq!(id, "4HPwATDgc/ABMA");
     }
@@ -765,7 +756,7 @@ mod tests {
             "zGbiIYCYD3gALA", // O off
         ];
         for pid in pids {
-            let game = super::Position::from_id(&pid.to_string()).unwrap();
+            let game = Backgammon::from_id(&pid.to_string()).unwrap();
             assert_eq!(pid, game.position_id());
         }
     }
@@ -774,16 +765,17 @@ mod tests {
 #[cfg(test)]
 mod private_tests {
     use crate::{
-        position::{Position, O_BAR, STARTING},
-        Dice,
+        bpos,
+        position::{Position, O_BAR},
+        Backgammon, Dice, State,
     };
-    use std::collections::HashMap;
 
     #[test]
     fn starting_position_is_correct_and_symmetric() {
-        let expected = pos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2);
-        assert_eq!(STARTING, expected);
-        assert_eq!(STARTING, STARTING.flip());
+        let expected = bpos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2);
+        let starting = Backgammon::new();
+        assert_eq!(starting, expected);
+        assert_eq!(starting, starting.flip());
     }
 
     #[test]
@@ -823,13 +815,6 @@ mod private_tests {
         let given = pos!(x 4:10; o);
         assert!(!given.can_move_in_board(5, 2));
     }
-
-    #[test]
-    fn cannot_move_opposing_checker() {
-        let given = Position::from(&HashMap::new(), &HashMap::from([(4, 10)]));
-        assert!(!given.can_move_in_board(4, 2));
-    }
-
     #[test]
     fn cannot_move_would_land_on_two_opposing_checkers() {
         let given = pos!(x 4:10; o 2:2);
@@ -927,8 +912,8 @@ mod private_tests {
             ("u20DYAD77hEAAA", (6, 3), 3),
         ];
 
-        fn number_of_moves(position: &Position, dice: &Dice) -> usize {
-            let all = position.all_positions_after_moving(dice);
+        fn number_of_moves(position: &Backgammon, dice: &Dice) -> usize {
+            let all = position.possible_positions(dice);
             if all.len() == 1 && all.first().unwrap().flip() == *position {
                 0
             } else {
@@ -936,7 +921,7 @@ mod private_tests {
             }
         }
         for (id, dice, number) in positions {
-            let position = Position::from_id(&id.to_string()).unwrap();
+            let position = Backgammon::from_id(&id.to_string()).unwrap();
             let dice = Dice::new(dice.0, dice.1);
             assert_eq!(
                 number_of_moves(&position, &dice),
