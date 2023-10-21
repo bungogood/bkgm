@@ -81,8 +81,11 @@ impl State for Backgammon {
 macro_rules! bpos {
     ( x $( $x_pip:tt : $x_checkers:tt ), * ;o $( $o_pip:tt : $o_checkers:tt ), * ) => {
         {
+            #[allow(unused_mut)]
             let mut pips = [0; 26];
+            #[allow(unused_mut)]
             let mut x_pieces = 0;
+            #[allow(unused_mut)]
             let mut o_pieces = 0;
 
             $(
@@ -97,7 +100,6 @@ macro_rules! bpos {
 
             let x_off = 15 - x_pieces;
             let o_off = 15 - o_pieces;
-
 
             Backgammon::from_macro(pips, x_off, o_off)
         }

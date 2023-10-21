@@ -267,7 +267,6 @@ mod tests {
     use crate::dice::RegularDice;
     use crate::pos;
     use crate::position::{Position, O_BAR, X_BAR};
-    use std::collections::HashMap;
 
     // Two checkers on bar
 

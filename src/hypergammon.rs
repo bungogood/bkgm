@@ -111,7 +111,9 @@ macro_rules! hpos {
         {
             #[allow(unused_mut)]
             let mut pips = [0; 26];
+            #[allow(unused_mut)]
             let mut x_pieces = 0;
+            #[allow(unused_mut)]
             let mut o_pieces = 0;
 
             $(
