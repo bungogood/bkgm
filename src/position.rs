@@ -129,6 +129,22 @@ pub trait State: Sized + Sync + Clone + Copy + PartialEq + Eq + fmt::Debug {
         }
     }
 
+    fn from_id(id: &String) -> Option<Self> {
+        Position::from_id(id, Self::NUM_CHECKERS).map(|p| Self::from_position(p))
+    }
+
+    fn position_id(&self) -> String {
+        self.position().position_id()
+    }
+
+    fn decode(key: [u8; 10]) -> Self {
+        Self::from_position(Position::decode(key, Self::NUM_CHECKERS))
+    }
+
+    fn encode(&self) -> [u8; 10] {
+        self.position().encode()
+    }
+
     fn game_state(&self) -> GameState {
         debug_assert!(
             self.x_off() < Self::NUM_CHECKERS || self.o_off() < Self::NUM_CHECKERS,
@@ -153,18 +169,6 @@ pub trait State: Sized + Sync + Clone + Copy + PartialEq + Eq + fmt::Debug {
         } else {
             Ongoing
         }
-    }
-
-    fn position_id(&self) -> String {
-        let key = self.encode();
-        let b64 = general_purpose::STANDARD.encode(key);
-        b64[..14].to_string()
-    }
-
-    fn from_id(id: &String) -> Option<Self> {
-        let padded_id = format!("{}==", id);
-        let key = general_purpose::STANDARD.decode(padded_id).unwrap();
-        Some(Self::decode(key.try_into().unwrap()))
     }
 
     fn dbhash(&self) -> usize;
@@ -212,89 +216,6 @@ pub trait State: Sized + Sync + Clone + Copy + PartialEq + Eq + fmt::Debug {
             (val, _) if val < -row => print!(" O "),
             _ => print!("   "),
         }
-    }
-
-    fn encode(&self) -> [u8; 10] {
-        let mut key = [0u8; 10];
-        let mut bit_index = 0;
-
-        // Encoding the position for the player not on roll
-        for point in (1..=24).rev() {
-            for _ in 0..-self.pip(point) {
-                key[bit_index / 8] |= 1 << (bit_index % 8);
-                bit_index += 1; // Appending a 1
-            }
-            bit_index += 1; // Appending a 0
-        }
-        for _ in 0..self.o_bar() {
-            key[bit_index / 8] |= 1 << (bit_index % 8);
-            bit_index += 1; // Appending a 1
-        }
-        bit_index += 1; // Appending a 0
-
-        // Encoding the position for the player on roll
-        for point in 1..=24 {
-            for _ in 0..self.pip(point) {
-                key[bit_index / 8] |= 1 << (bit_index % 8);
-                bit_index += 1; // Appending a 1
-            }
-            bit_index += 1; // Appending a 0
-        }
-        for _ in 0..self.x_bar() {
-            key[bit_index / 8] |= 1 << (bit_index % 8);
-            bit_index += 1; // Appending a 1
-        }
-
-        key
-    }
-
-    fn decode(key: [u8; 10]) -> Self {
-        let mut bit_index = 0;
-        let mut pips = [0i8; 26];
-
-        let mut x_bar = 0;
-        let mut o_bar = 0;
-        let mut x_pieces = 0;
-        let mut o_pieces = 0;
-
-        for point in (0..24).rev() {
-            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-                pips[point + 1] -= 1;
-                o_pieces += 1;
-                bit_index += 1;
-            }
-            bit_index += 1; // Appending a 0
-        }
-
-        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-            o_bar += 1;
-            bit_index += 1;
-        }
-
-        bit_index += 1; // Appending a 0
-
-        for point in 0..24 {
-            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-                pips[point + 1] += 1;
-                x_pieces += 1;
-                bit_index += 1;
-            }
-            bit_index += 1; // Appending a 0
-        }
-
-        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-            x_bar += 1;
-            bit_index += 1;
-        }
-
-        pips[X_BAR] = x_bar;
-        pips[O_BAR] = -o_bar;
-
-        Self::from_position(Position {
-            pips,
-            x_off: Self::NUM_CHECKERS - x_pieces - x_bar as u8,
-            o_off: Self::NUM_CHECKERS - o_pieces - o_bar as u8,
-        })
     }
 }
 
@@ -381,6 +302,101 @@ impl Position {
             pips,
             x_off: self.o_off,
             o_off: self.x_off,
+        }
+    }
+
+    pub fn position_id(&self) -> String {
+        let key = self.encode();
+        let b64 = general_purpose::STANDARD.encode(key);
+        b64[..14].to_string()
+    }
+
+    pub fn from_id(id: &String, num_checkers: u8) -> Option<Self> {
+        let padded_id = format!("{}==", id);
+        let key = general_purpose::STANDARD.decode(padded_id).unwrap();
+        Some(Self::decode(key.try_into().unwrap(), num_checkers))
+    }
+
+    pub fn encode(&self) -> [u8; 10] {
+        let mut key = [0u8; 10];
+        let mut bit_index = 0;
+
+        // Encoding the position for the player not on roll
+        for point in (1..=24).rev() {
+            for _ in 0..-self.pip(point) {
+                key[bit_index / 8] |= 1 << (bit_index % 8);
+                bit_index += 1; // Appending a 1
+            }
+            bit_index += 1; // Appending a 0
+        }
+        for _ in 0..self.o_bar() {
+            key[bit_index / 8] |= 1 << (bit_index % 8);
+            bit_index += 1; // Appending a 1
+        }
+        bit_index += 1; // Appending a 0
+
+        // Encoding the position for the player on roll
+        for point in 1..=24 {
+            for _ in 0..self.pip(point) {
+                key[bit_index / 8] |= 1 << (bit_index % 8);
+                bit_index += 1; // Appending a 1
+            }
+            bit_index += 1; // Appending a 0
+        }
+        for _ in 0..self.x_bar() {
+            key[bit_index / 8] |= 1 << (bit_index % 8);
+            bit_index += 1; // Appending a 1
+        }
+
+        key
+    }
+
+    pub fn decode(key: [u8; 10], num_checkers: u8) -> Self {
+        let mut bit_index = 0;
+        let mut pips = [0i8; 26];
+
+        let mut x_bar = 0;
+        let mut o_bar = 0;
+        let mut x_pieces = 0;
+        let mut o_pieces = 0;
+
+        for point in (0..24).rev() {
+            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
+                pips[point + 1] -= 1;
+                o_pieces += 1;
+                bit_index += 1;
+            }
+            bit_index += 1; // Appending a 0
+        }
+
+        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
+            o_bar += 1;
+            bit_index += 1;
+        }
+
+        bit_index += 1; // Appending a 0
+
+        for point in 0..24 {
+            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
+                pips[point + 1] += 1;
+                x_pieces += 1;
+                bit_index += 1;
+            }
+            bit_index += 1; // Appending a 0
+        }
+
+        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
+            x_bar += 1;
+            bit_index += 1;
+        }
+
+        pips[X_BAR] = x_bar;
+        pips[O_BAR] = -o_bar;
+
+        Position {
+            pips,
+            x_off: num_checkers - x_pieces - x_bar as u8,
+            o_off: num_checkers - o_pieces - o_bar as u8,
         }
     }
 }
