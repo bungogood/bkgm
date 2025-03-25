@@ -1,9 +1,10 @@
-use crate::position::{Position, O_BAR, X_BAR};
-use std::cmp::min;
+use crate::position::{Position, MOVES_CAPACITY, O_BAR, X_BAR};
+use std::cmp::{max, min};
 
-impl Position {
+impl<const N: u8> Position<N> {
     /// Returns a vector of all possible moves when rolling a double.
-    pub(super) fn all_positions_after_double_move(&self, die: usize) -> Vec<Position> {
+    #[inline]
+    pub(super) fn all_positions_after_double_move(&self, die: usize) -> Vec<Self> {
         if self.pips[X_BAR] > 0 && self.pips[X_BAR - die] < -1 {
             // Has at least one checker on the bar but can't move it
             return vec![*self];
@@ -20,7 +21,7 @@ impl Position {
     }
 
     /// Returns the position after entering all possible checkers and the number of entered checkers (0 to 4)
-    fn position_after_entering_checkers(&self, die: usize) -> (Position, u32) {
+    fn position_after_entering_checkers(&self, die: usize) -> (Self, u32) {
         if self.pips[X_BAR] == 0 {
             return (*self, 0);
         }
@@ -45,71 +46,104 @@ impl Position {
         &self,
         die: usize,
         number_of_entered_checkers: u32,
-    ) -> Vec<Position> {
+    ) -> Vec<Self> {
         let nr_movable_checkers = self.number_of_movable_checkers(die, number_of_entered_checkers);
         if nr_movable_checkers == 0 {
             return vec![*self];
         }
-        let mut moves: Vec<Position> = Vec::new();
-        for i1 in (1..X_BAR).rev() {
-            if self.can_move_in_board(i1, die) {
+        let mut moves: Vec<Self> = Vec::with_capacity(MOVES_CAPACITY);
+        (self.smallest_pip_to_check(die)..X_BAR).for_each(|i1| {
+            if self.can_move_when_bearoff_is_legal(i1, die) {
                 let pos = self.clone_and_move_single_checker(i1, die);
                 if nr_movable_checkers == 1 {
                     moves.push(pos);
-                    continue;
+                    return;
                 }
-                for i2 in (1..i1 + 1).rev() {
-                    if pos.can_move_in_board(i2, die) {
+                (pos.smallest_pip_to_check(die)..i1 + 1).for_each(|i2| {
+                    if pos.can_move_when_bearoff_is_legal(i2, die) {
                         let pos = pos.clone_and_move_single_checker(i2, die);
                         if nr_movable_checkers == 2 {
                             moves.push(pos);
-                            continue;
+                            return;
                         }
-                        for i3 in (1..i2 + 1).rev() {
-                            if pos.can_move_in_board(i3, die) {
+                        (pos.smallest_pip_to_check(die)..i2 + 1).for_each(|i3| {
+                            if pos.can_move_when_bearoff_is_legal(i3, die) {
                                 let pos = pos.clone_and_move_single_checker(i3, die);
                                 if nr_movable_checkers == 3 {
                                     moves.push(pos);
-                                    continue;
+                                    return;
                                 }
-                                for i4 in (1..i3 + 1).rev() {
-                                    if pos.can_move_in_board(i4, die) {
+                                (pos.smallest_pip_to_check(die)..i3 + 1).for_each(|i4| {
+                                    if pos.can_move_when_bearoff_is_legal(i4, die) {
                                         let pos = pos.clone_and_move_single_checker(i4, die);
                                         moves.push(pos);
                                     }
-                                }
+                                });
                             }
-                        }
+                        });
                     }
-                }
+                });
             }
-        }
+        });
         moves
     }
 
     /// Will return 4 if 4 or more checkers can be moved.
-    /// The return value is never bigger than `number_of_entered_checkers`.
     /// Will return 0 if no checker can be moved.
+    ///
+    /// If for example `number_of_entered_checkers` is 1, the maximum return value is 3.
     fn number_of_movable_checkers(&self, die: usize, number_of_entered_checkers: u32) -> u32 {
         let mut number_of_checkers = 0;
         let mut pip = 24;
         let mut position = *self;
-        while number_of_checkers < 4 - number_of_entered_checkers && pip > 0 {
-            if position.can_move_in_board(pip, die) {
-                position.move_single_checker(pip, die);
-                number_of_checkers += 1;
-            } else {
-                pip -= 1;
+        let max_return_value = 4 - number_of_entered_checkers;
+
+        // non bear off moves
+        while number_of_checkers < max_return_value && pip > die {
+            if position.can_move_when_bearoff_is_legal(pip, die) {
+                let number_to_move = position.pips[pip];
+                position.pips[pip] = 0;
+                if position.pips[pip - die] == -1 {
+                    // hit opponent
+                    position.pips[pip - die] = number_to_move;
+                } else {
+                    position.pips[pip - die] += number_to_move;
+                }
+                number_of_checkers += number_to_move as u32;
+            }
+            pip -= 1;
+        }
+        if number_of_checkers >= max_return_value {
+            return max_return_value;
+        }
+        // bear off moves
+        match position.pips.iter().rposition(|&p| p > 0) {
+            None => number_of_checkers,
+            Some(biggest_pip) => {
+                let bearoff_checkers: u32 = if biggest_pip > 6 {
+                    0 // no bearoff possible
+                } else if biggest_pip > die {
+                    // Only exact bearoff possible
+                    // We need the `max` in case there are opponent's checkers on the pip.
+                    max(0, position.pips[die]) as u32
+                } else {
+                    // no checkers on bigger pips, all bearoffs legal
+                    position.pips[1..die + 1]
+                        .iter()
+                        .filter(|&&p| p > 0)
+                        .sum::<i8>() as u32
+                };
+                number_of_checkers += bearoff_checkers;
+                min(number_of_checkers, max_return_value)
             }
         }
-        number_of_checkers
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::position::{Position, O_BAR, X_BAR};
-    use crate::{bpos, pos, Backgammon, State};
+    use crate::pos;
+    use crate::position::{O_BAR, X_BAR};
 
     #[test]
     fn cannot_enter_from_the_bar() {
@@ -153,23 +187,23 @@ mod tests {
         let expected1 = pos!(x 19:2, 4:1, 3:1; o 24:2);
         let expected2 = pos!(x 22:1, 16:1, 4:1, 3:1; o 24:2);
         let expected3 = pos!(x 22:1, 19:1, 3:1, 1:1; o 24:2);
-        assert_eq!(resulting_positions, vec![expected1, expected2, expected3]);
+        assert_eq!(resulting_positions, vec![expected3, expected2, expected1]);
     }
 
     #[test]
     fn bearoff_4_or_bearoff_less() {
         // Given
-        let position = bpos!(x 4:1, 3:1, 2:4; o 22:2).position();
+        let position = pos!(x 4:1, 3:1, 2:4; o 22:2);
         // When
         let resulting_positions = position.all_positions_after_double_move(2);
         // Then
-        let expected1 = bpos!(x 2:3, 1:1; o 22:2).position();
-        let expected2 = bpos!(x 3:1, 2:2; o 22:2).position();
-        let expected3 = bpos!(x 4:1, 2:1, 1:1; o 22:2).position();
-        let expected4 = bpos!(x 4:1, 3:1; o 22:2).position();
+        let expected1 = pos!(x 2:3, 1:1; o 22:2);
+        let expected2 = pos!(x 3:1, 2:2; o 22:2);
+        let expected3 = pos!(x 4:1, 2:1, 1:1; o 22:2);
+        let expected4 = pos!(x 4:1, 3:1; o 22:2);
         assert_eq!(
             resulting_positions,
-            vec![expected1, expected2, expected3, expected4],
+            vec![expected4, expected3, expected2, expected1],
         );
     }
 
@@ -199,7 +233,6 @@ mod tests {
 #[cfg(test)]
 mod private_tests {
     use crate::pos;
-    use crate::position::Position;
 
     #[test]
     fn number_of_movable_checkers_when_completely_blocked() {

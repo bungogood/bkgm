@@ -1,114 +1,115 @@
-use std::fmt;
-
 /// Contains a legal pair of dice (values between 1 and 6).
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Dice {
-    Regular(RegularDice),
+    Mixed(MixedDice),
     Double(usize),
 }
 
-/// Contains two different values between 1 and six. `big` is bigger than `small`.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct RegularDice {
-    pub big: usize,
-    pub small: usize,
-}
-
-pub const ALL_SINGLES: [Dice; 15] = Dice::all_singles();
-pub const ALL_21: [(Dice, f32); 21] = Dice::all_21();
-pub const ALL_36: [Dice; 36] = Dice::all_36();
-pub const ALL_1296: [(Dice, Dice); 1296] = Dice::all_1296();
-
-impl fmt::Display for Dice {
+impl std::fmt::Display for Dice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Dice::Regular(dice) => write!(f, "({},{})", dice.big, dice.small),
+            Dice::Mixed(dice) => write!(f, "({},{})", dice.small, dice.big),
             Dice::Double(die) => write!(f, "({},{})", die, die),
         }
     }
 }
 
+/// Contains two different values between 1 and six. `big` is bigger than `small`.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct MixedDice {
+    pub(crate) big: usize,
+    pub(crate) small: usize,
+}
+
+/// Contains all 441 possibilities of for two rolls of dice.
+///
+/// As `usize` is also returned how often those dice on average appear in 1296 rolls.
+/// Two double rolls appear 1 time, two mixed rolls appear 4 times.
+/// A combination of a double and a mixed roll appears 2 times.
+pub const ALL_441: [([Dice; 2], usize); 441] = Dice::all_441();
+
+/// Contains all 21 possibilities of dice and a number of how often they appear in 36 rolls.
+///
+/// So doubles appear 1 time, mixed rolls appear 2 times.
+pub const ALL_21: [(Dice, usize); 21] = Dice::all_21();
+
+pub const ALL_SINGLES: [Dice; 15] = Dice::all_15_mixed();
+
 impl Dice {
-    #[inline(always)]
+    #[inline]
     pub const fn new(die1: usize, die2: usize) -> Self {
+        debug_assert!(die1 > 0);
+        debug_assert!(die1 < 7);
+        debug_assert!(die2 > 0);
+        debug_assert!(die2 < 7);
         if die1 == die2 {
             Dice::Double(die1)
         } else {
-            Dice::Regular(RegularDice::new(die1, die2))
+            Dice::Mixed(MixedDice::new(die1, die2))
         }
     }
+    const fn all_441() -> [([Dice; 2], usize); 441] {
+        let mut dice_441 = [([Dice::Double(1), Dice::Double(1)], 0_usize); 441]; // Dummy values, will be replaced
+        let dice_21 = ALL_21;
 
-    /// Contains all 21 unique possibilities of dice.
-    const fn all_singles() -> [Dice; 15] {
+        let mut i = 0_usize;
+        while i < 21 {
+            let mut j = 0_usize;
+            while j < 21 {
+                let a = dice_21[i];
+                let b = dice_21[j];
+                dice_441[i * 21 + j] = ([a.0, b.0], a.1 * b.1);
+                j += 1;
+            }
+            i += 1;
+        }
+        dice_441
+    }
+
+    /// All 6 double rolls. Used in tests.
+    pub const fn all_6_double() -> [Dice; 6] {
+        let mut dice = [Dice::Double(1); 6];
+        let mut i = 0_usize;
+        while i < 6 {
+            dice[i] = Dice::new(i + 1, i + 1);
+            i += 1;
+        }
+        dice
+    }
+
+    /// All 15 rolls with mixed dice (no doubles). Used in tests.
+    pub const fn all_15_mixed() -> [Dice; 15] {
         let mut dice = [Dice::Double(1); 15]; // Dummy values, will be replaced
 
         // for loops don't work with `const fn`
-        let mut count = 0;
         let mut i = 0_usize;
+        let mut dice_index = 0_usize;
         while i < 6 {
             let mut j = i + 1;
             while j < 6 {
-                dice[count] = Dice::new(i + 1, j + 1);
+                dice[dice_index] = Dice::new(i + 1, j + 1);
                 j += 1;
-                count += 1;
+                dice_index += 1;
             }
             i += 1;
         }
         dice
     }
 
-    /// Contains all 21 unique possibilities of dice.
-    const fn all_21() -> [(Dice, f32); 21] {
-        let mut dice = [(Dice::Double(1), 0.0); 21]; // Dummy values, will be replaced
+    const fn all_21() -> [(Dice, usize); 21] {
+        let mut dice = [(Dice::Double(1), 0_usize); 21]; // Dummy values, will be replaced
 
         // for loops don't work with `const fn`
-        let mut count = 0;
         let mut i = 0_usize;
+        let mut dice_index = 0_usize;
         while i < 6 {
-            dice[count] = (Dice::Double(i + 1), 1.0);
-            count += 1;
             let mut j = i + 1;
+            dice[dice_index] = (Dice::new(i + 1, i + 1), 1);
+            dice_index += 1;
             while j < 6 {
-                dice[count] = (Dice::new(i + 1, j + 1), 2.0);
+                dice[dice_index] = (Dice::new(i + 1, j + 1), 2);
                 j += 1;
-                count += 1;
-            }
-            i += 1;
-        }
-        dice
-    }
-
-    /// Contains all 36 possibilities of dice. Regular dice will appear twice.
-    const fn all_36() -> [Dice; 36] {
-        let mut dice = [Dice::Double(1); 36]; // Dummy values, will be replaced
-
-        // for loops don't work with `const fn`
-        let mut i = 0_usize;
-        while i < 6 {
-            let mut j = 0_usize;
-            while j < 6 {
-                dice[i * 6 + j] = Dice::new(i + 1, j + 1);
-                j += 1;
-            }
-            i += 1;
-        }
-        dice
-    }
-
-    /// Contains all 1296 possibilities of the first two rolls. Regular dice will appear multiple times.
-    const fn all_1296() -> [(Dice, Dice); 1296] {
-        let dummy_value = (Dice::Double(1), Dice::Double(1));
-        let mut dice = [dummy_value; 1296];
-        let all_36 = ALL_36;
-
-        // for loops don't work with `const fn`
-        let array_length = 36;
-        let mut i = 0_usize;
-        while i < array_length {
-            let mut j = 0_usize;
-            while j < array_length {
-                dice[i * array_length + j] = (all_36[i], all_36[j]);
-                j += 1;
+                dice_index += 1;
             }
             i += 1;
         }
@@ -128,9 +129,18 @@ impl TryFrom<(usize, usize)> for Dice {
     }
 }
 
-impl RegularDice {
-    #[inline(always)]
-    pub(crate) const fn new(die1: usize, die2: usize) -> Self {
+impl MixedDice {
+    #[inline]
+    pub fn small(&self) -> usize {
+        self.small
+    }
+
+    #[inline]
+    pub fn big(&self) -> usize {
+        self.big
+    }
+    #[inline]
+    pub const fn new(die1: usize, die2: usize) -> Self {
         let (big, small) = if die1 > die2 {
             (die1, die2)
         } else {
@@ -142,38 +152,36 @@ impl RegularDice {
 
 #[cfg(test)]
 mod dice_tests {
-    use crate::dice::Dice;
+    use crate::dice::Dice::{Double, Mixed};
+    use crate::dice::{Dice, ALL_441};
+    use std::collections::HashSet;
 
     #[test]
-    fn all_36() {
-        let all_36 = Dice::all_36();
-
-        let smallest_double = Dice::new(1, 1);
-        assert_eq!(all_36.iter().filter(|x| x == &&smallest_double).count(), 1);
-
-        let biggest_double = Dice::new(6, 6);
-        assert_eq!(all_36.iter().filter(|x| x == &&biggest_double).count(), 1);
-
-        let regular = Dice::new(1, 6);
-        assert_eq!(all_36.iter().filter(|x| x == &&regular).count(), 2);
+    fn all_441() {
+        let all_441 = ALL_441;
+        let sum_of_numbers: usize = all_441.iter().map(|element| element.1).sum();
+        assert_eq!(sum_of_numbers, 1296);
+        for (dice, number) in all_441 {
+            match (dice[0], dice[1]) {
+                (Mixed(_), Mixed(_)) => assert_eq!(number, 4),
+                (Double(_), Mixed(_)) => assert_eq!(number, 2),
+                (Mixed(_), Double(_)) => assert_eq!(number, 2),
+                (Double(_), Double(_)) => assert_eq!(number, 1),
+            }
+        }
     }
+
     #[test]
-    fn all_1296() {
-        let all_1296 = Dice::all_1296();
-
-        let double_double = (Dice::new(1, 1), Dice::new(6, 6));
-        assert_eq!(all_1296.iter().filter(|x| x == &&double_double).count(), 1);
-
-        let double_regular = (Dice::new(2, 2), Dice::new(5, 4));
-        assert_eq!(all_1296.iter().filter(|x| x == &&double_regular).count(), 2);
-
-        let regular_double = (Dice::new(2, 3), Dice::new(5, 5));
-        assert_eq!(all_1296.iter().filter(|x| x == &&regular_double).count(), 2);
-
-        let regular_regular = (Dice::new(2, 3), Dice::new(3, 5));
-        assert_eq!(
-            all_1296.iter().filter(|x| x == &&regular_regular).count(),
-            4
-        );
+    fn all_441_has_distinct_dice() {
+        let all_441 = ALL_441;
+        let mut dice_set: HashSet<[Dice; 2]> = HashSet::new();
+        for (dice, _) in all_441 {
+            match dice[0] {
+                Mixed(dice) => assert!(dice.small > 0 && dice.big < 7),
+                Double(die) => assert!(die > 0 && die < 7),
+            }
+            dice_set.insert(dice);
+        }
+        assert_eq!(dice_set.len(), 441);
     }
 }

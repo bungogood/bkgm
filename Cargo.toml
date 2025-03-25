@@ -13,3 +13,4 @@ exclude = [".github/"]
 
 [dependencies]
 base64 = "0.21.4"
+fastrand = "2.3.0"
