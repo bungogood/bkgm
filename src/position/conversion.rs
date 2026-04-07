@@ -39,11 +39,13 @@ impl<const N: u8> Position<N> {
     }
 
     pub fn from_id(id: &str) -> Self {
-        let mut bytes = [0; 10];
-        general_purpose::STANDARD_NO_PAD
-            .decode_slice(id, &mut bytes)
+        let bytes = general_purpose::STANDARD_NO_PAD
+            .decode(id)
             .expect("Position encoding expects valid id.");
-        Self::decode(bytes)
+        let key: [u8; 10] = bytes
+            .try_into()
+            .expect("Position encoding expects 10 decoded bytes.");
+        Self::decode(key)
     }
 
     fn encode(&self) -> [u8; 10] {

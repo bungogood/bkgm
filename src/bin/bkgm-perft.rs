@@ -78,7 +78,8 @@ fn main() {
     let die0 = parse_usize_flag(&args, "--die0");
     let die1 = parse_usize_flag(&args, "--die1");
 
-    let position = <Position<15> as State>::from_id(&position_id).expect("invalid --position-id");
+    let position =
+        <Position<15> as State>::from_id(position_id.as_str()).expect("invalid --position-id");
 
     if let (Some(d0), Some(d1)) = (die0, die1) {
         assert!(

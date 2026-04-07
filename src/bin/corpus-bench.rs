@@ -14,7 +14,7 @@ fn load_positions(path: &str) -> Vec<Position<15>> {
         .expect("could not read corpus file")
         .lines()
         .filter(|l| !l.trim().is_empty())
-        .map(|id| <Position<15> as State>::from_id(&id.to_string()).expect("invalid position id"))
+        .map(|id| <Position<15> as State>::from_id(id).expect("invalid position id"))
         .collect()
 }
 

@@ -87,7 +87,7 @@ impl Variant {
     pub fn from_position_id(self, id: &str) -> Option<VariantPosition> {
         match self {
             Variant::Backgammon | Variant::Nackgammon | Variant::Longgammon => {
-                <Position<15> as State>::from_id(&id.to_string()).map(|p| match self {
+                <Position<15> as State>::from_id(id).map(|p| match self {
                     Variant::Backgammon => VariantPosition::Backgammon(p),
                     Variant::Nackgammon => VariantPosition::Nackgammon(p),
                     Variant::Longgammon => VariantPosition::Longgammon(p),
@@ -95,16 +95,16 @@ impl Variant {
                 })
             }
             Variant::Hypergammon => {
-                <Position<3> as State>::from_id(&id.to_string()).map(VariantPosition::Hypergammon)
+                <Position<3> as State>::from_id(id).map(VariantPosition::Hypergammon)
             }
             Variant::Hypergammon2 => {
-                <Position<2> as State>::from_id(&id.to_string()).map(VariantPosition::Hypergammon2)
+                <Position<2> as State>::from_id(id).map(VariantPosition::Hypergammon2)
             }
             Variant::Hypergammon4 => {
-                <Position<4> as State>::from_id(&id.to_string()).map(VariantPosition::Hypergammon4)
+                <Position<4> as State>::from_id(id).map(VariantPosition::Hypergammon4)
             }
             Variant::Hypergammon5 => {
-                <Position<5> as State>::from_id(&id.to_string()).map(VariantPosition::Hypergammon5)
+                <Position<5> as State>::from_id(id).map(VariantPosition::Hypergammon5)
             }
         }
     }

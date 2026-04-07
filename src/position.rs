@@ -102,7 +102,7 @@ pub trait State: Sized + Sync + Clone + Copy + Hash + PartialEq + Eq + fmt::Debu
 
     fn phase(&self) -> GamePhase;
 
-    fn from_id(id: &String) -> Option<Self>;
+    fn from_id(id: &str) -> Option<Self>;
 
     fn position_id(&self) -> String;
 
@@ -339,7 +339,7 @@ impl<const N: u8> State for Position<N> {
         b64[..14].to_string()
     }
 
-    fn from_id(id: &String) -> Option<Self> {
+    fn from_id(id: &str) -> Option<Self> {
         let padded_id = format!("{}==", id);
         let key = general_purpose::STANDARD.decode(padded_id).unwrap();
         Some(Self::decode(key.try_into().unwrap()))
@@ -551,6 +551,21 @@ impl<const N: u8> Position<N> {
             *position = position.flip();
         }
         debug_assert!(!out.is_empty());
+    }
+
+    pub fn possible_positions_len_in(&self, dice: &Dice, scratch: &mut Vec<Self>) -> usize {
+        self.possible_positions_in(dice, scratch);
+        scratch.len()
+    }
+
+    pub fn for_each_possible_position_in<F>(&self, dice: &Dice, scratch: &mut Vec<Self>, mut f: F)
+    where
+        F: FnMut(Self),
+    {
+        self.possible_positions_in(dice, scratch);
+        for &position in scratch.iter() {
+            f(position);
+        }
     }
 
     /// Only call if this move is legal.
@@ -792,6 +807,32 @@ mod tests {
         let expected1 = pos!(x X_BAR:1; o 5:1);
         let expected2 = pos!(x 3:1; o 5:1);
         assert_eq!(positions, [expected1, expected2]);
+    }
+
+    #[test]
+    fn possible_positions_len_in_matches_possible_positions_len() {
+        let pos = pos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2);
+        let dice = Dice::new(3, 1);
+
+        let expected = pos.possible_positions(&dice).len();
+        let mut scratch = Vec::with_capacity(256);
+        let actual = pos.possible_positions_len_in(&dice, &mut scratch);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn for_each_possible_position_in_matches_possible_positions() {
+        let pos = pos!(x X_BAR:1, 6:4, 3:3; o 24:2, 20:2, 18:2, 1:9);
+        let dice = Dice::new(5, 2);
+
+        let expected = pos.possible_positions(&dice);
+        let mut actual = Vec::new();
+        let mut scratch = Vec::with_capacity(256);
+
+        pos.for_each_possible_position_in(&dice, &mut scratch, |next| actual.push(next));
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
