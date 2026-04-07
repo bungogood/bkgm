@@ -2,9 +2,37 @@
 
 [![Build](../../actions/workflows/build.yaml/badge.svg)](../../actions/workflows/build.yaml)
 
-Bkgm is a versatile Rust crate designed to facilitate Backgammon-related operations, such as move generation, position parsing, conversion between standards, and the implementation of the [perfect hash](https://api.semanticscholar.org/CorpusID:60574812) for bearoff and hypergammon databases. It supports both traditional Backgammon and 3-checker Hypergammon.
+Bkgm is an engine-first Rust core for backgammon variants. It focuses on fast, correct move generation while still providing a user-friendly variant/game API for building bots, tools, services, and experiments.
 
-The project direction is to keep `bkgm` as a common/shared Backgammon core library that can be reused by different engines, tooling, services, and research workflows (including RL/self-play experiments), rather than tying it to one specific executable.
+The project direction is similar to the role of `cozy-chess` in chess: a reusable high-performance core that other projects can build on top of.
+
+## API Layers
+
+- Core hot path: `Position<N>` and movegen APIs (`possible_positions`, `possible_positions_in`).
+- Variant UX layer: `Variant`, `VariantSpec`, `VariantPosition`, and `Game`.
+- Presets: starting positions and built-in variants in `variants`.
+
+Most consumers should start with the variant/game layer and use `Position<N>` directly when they need maximum control.
+
+## Quick Start (Variant/Game UX)
+
+```rust
+use bkgm::{Dice, Game, Variant};
+
+let mut game = Game::new(Variant::Backgammon);
+let legal = game.legal_positions(&Dice::new(3, 1));
+game.set_position(legal[0]).unwrap();
+```
+
+## Quick Start (Core API)
+
+```rust
+use bkgm::{Dice, State};
+use bkgm::variants::BACKGAMMON;
+
+let mut out = Vec::with_capacity(256);
+BACKGAMMON.possible_positions_in(&Dice::new(3, 1), &mut out);
+```
 
 ## Example Position
 
@@ -29,25 +57,22 @@ Position ID: 4HPwATDgc/ABMA
 
 ## Features
 
--   Support for the Gnubg position id format.
--   Ability to generate possible positions.
--   Macros to create Backgammon and Hypergammon positions.
--   State trait implemented for both Backgammon and Hypergammon.
+- Support for GNUbg position IDs.
+- Fast legal move/position generation.
+- Variant presets (Backgammon, Nackgammon, Longgammon, Hypergammon variants).
+- High-level game/variant API plus low-level core API.
 
 ## Performance Direction
 
--   Move generation correctness and speed are the top priority.
--   Benchmark-driven optimization is preferred over speculative refactors.
--   We actively compare against strong references such as [Wildbg](https://github.com/carsten-wenderdel/wildbg).
+- Move generation correctness and speed are the top priority.
+- Benchmark-driven optimization is preferred over speculative refactors.
+- We actively compare against strong references such as [Wildbg](https://github.com/carsten-wenderdel/wildbg).
 
 ## TODO
 
--   Move generation (next possible position generation is already implemented).
--   Move parsing (e.g., 24/23*/22*/21\*).
--   Improve test coverage.
--   Add a game trait, enabling Mat files.
--   Addition of optional rules
--   Improve macros to work with bar and off
+- Move parsing/notation (e.g., `24/23*/22*/21*`).
+- Expand rule-profile support for more variant families.
+- Improve test coverage and performance regression guardrails.
 
 ## References
 
