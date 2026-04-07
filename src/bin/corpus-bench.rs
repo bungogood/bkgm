@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::PathBuf;
 use std::time::Instant;
 
 use bkgm::dice::ALL_21;
@@ -58,12 +59,14 @@ fn bench(name: &str, positions: &[Position<15>], iterations: usize) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let contact_path = parse_string_flag(&args, "--contact-csv").unwrap_or_else(|| {
-        panic!("missing --contact-csv <path>");
-    });
-    let race_path = parse_string_flag(&args, "--race-csv").unwrap_or_else(|| {
-        panic!("missing --race-csv <path>");
-    });
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let default_contact = root.join("benches/resources/contact.csv");
+    let default_race = root.join("benches/resources/race.csv");
+
+    let contact_path = parse_string_flag(&args, "--contact-csv")
+        .unwrap_or_else(|| default_contact.display().to_string());
+    let race_path = parse_string_flag(&args, "--race-csv")
+        .unwrap_or_else(|| default_race.display().to_string());
     let iterations = parse_usize_flag(&args, "--iterations").unwrap_or(20).max(1);
 
     let contact = load_positions(&contact_path);
