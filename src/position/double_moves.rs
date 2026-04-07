@@ -4,20 +4,30 @@ use std::cmp::{max, min};
 impl<const N: u8> Position<N> {
     /// Returns a vector of all possible moves when rolling a double.
     #[inline]
+    #[allow(dead_code)]
     pub(super) fn all_positions_after_double_move(&self, die: usize) -> Vec<Self> {
+        let mut moves = Vec::with_capacity(MOVES_CAPACITY);
+        self.all_positions_after_double_move_into(die, &mut moves);
+        moves
+    }
+
+    #[inline]
+    pub(super) fn all_positions_after_double_move_into(&self, die: usize, moves: &mut Vec<Self>) {
+        moves.clear();
         if self.pips[X_BAR] > 0 && self.pips[X_BAR - die] < -1 {
             // Has at least one checker on the bar but can't move it
-            return vec![*self];
+            moves.push(*self);
+            return;
         }
 
         let (position, number_of_entered_checkers) = self.position_after_entering_checkers(die);
         if number_of_entered_checkers == 4 {
-            return vec![position];
+            moves.push(position);
+            return;
         }
 
-        let moves = position.double_moves_after_entering(die, number_of_entered_checkers);
+        position.double_moves_after_entering_into(die, number_of_entered_checkers, moves);
         debug_assert!(!moves.is_empty());
-        moves
     }
 
     /// Returns the position after entering all possible checkers and the number of entered checkers (0 to 4)
@@ -42,16 +52,18 @@ impl<const N: u8> Position<N> {
 
     /// Returns a vector of all possible moves after entering the checkers from the bar.
     /// It takes into account the number of already entered checkers.
-    fn double_moves_after_entering(
+    fn double_moves_after_entering_into(
         &self,
         die: usize,
         number_of_entered_checkers: u32,
-    ) -> Vec<Self> {
+        moves: &mut Vec<Self>,
+    ) {
+        moves.clear();
         let nr_movable_checkers = self.number_of_movable_checkers(die, number_of_entered_checkers);
         if nr_movable_checkers == 0 {
-            return vec![*self];
+            moves.push(*self);
+            return;
         }
-        let mut moves: Vec<Self> = Vec::with_capacity(MOVES_CAPACITY);
         (self.smallest_pip_to_check(die)..X_BAR).for_each(|i1| {
             if self.can_move_when_bearoff_is_legal(i1, die) {
                 let pos = self.clone_and_move_single_checker(i1, die);
@@ -85,7 +97,6 @@ impl<const N: u8> Position<N> {
                 });
             }
         });
-        moves
     }
 
     /// Will return 4 if 4 or more checkers can be moved.

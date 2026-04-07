@@ -6,20 +6,32 @@ impl<const N: u8> Position<N> {
     /// Returns all legal positions after rolling a double and then moving.
     /// The return values have not switched sides yet.
     #[inline]
+    #[allow(dead_code)]
     pub(super) fn all_positions_after_mixed_move(&self, dice: &MixedDice) -> Vec<Self> {
+        let mut moves = Vec::with_capacity(MOVES_CAPACITY);
+        self.all_positions_after_mixed_move_into(dice, &mut moves);
+        moves
+    }
+
+    #[inline]
+    pub(super) fn all_positions_after_mixed_move_into(
+        &self,
+        dice: &MixedDice,
+        moves: &mut Vec<Self>,
+    ) {
+        moves.clear();
         debug_assert!(dice.big > dice.small);
         match self.pips[X_BAR] {
-            0 => self.moves_with_0_checkers_on_bar(dice),
-            1 => self.moves_with_1_checker_on_bar(dice),
-            _ => self.moves_with_2_checkers_on_bar(dice),
+            0 => self.moves_with_0_checkers_on_bar_into(dice, moves),
+            1 => self.moves_with_1_checker_on_bar_into(dice, moves),
+            _ => self.moves_with_2_checkers_on_bar_into(dice, moves),
         }
     }
 
     /// Mixed moves with exactly 1 checker on the bar.
-    fn moves_with_1_checker_on_bar(&self, dice: &MixedDice) -> Vec<Self> {
+    fn moves_with_1_checker_on_bar_into(&self, dice: &MixedDice, moves: &mut Vec<Self>) {
         debug_assert!(self.pips[X_BAR] == 1);
 
-        let mut moves: Vec<Self> = Vec::with_capacity(MOVES_CAPACITY);
         let mut enter_big: Option<Self> = None;
         let mut enter_small: Option<Self> = None;
 
@@ -63,28 +75,26 @@ impl<const N: u8> Position<N> {
                 moves.push(*self);
             }
         }
-        moves
     }
 
     /// Mixed moves with no checkers on the bar.
-    fn moves_with_0_checkers_on_bar(&self, dice: &MixedDice) -> Vec<Self> {
+    fn moves_with_0_checkers_on_bar_into(&self, dice: &MixedDice, moves: &mut Vec<Self>) {
         debug_assert!(self.pips[X_BAR] == 0);
 
         // Let's try to find moves where both dice are used.
-        let mut moves = self.two_checker_moves(dice);
+        self.two_checker_moves_into(dice, moves);
         if moves.is_empty() {
             // No moves found with both dice used, so let's try the bigger die only.
-            self.one_checker_moves(dice.big, &mut moves);
+            self.one_checker_moves(dice.big, moves);
             if moves.is_empty() {
                 // No moves found with the bigger die used, so let's try the smaller one.
-                self.one_checker_moves(dice.small, &mut moves);
+                self.one_checker_moves(dice.small, moves);
                 if moves.is_empty() {
                     // The player can't move any checker, so we return the identical position.
                     moves.push(*self);
                 }
             }
         }
-        moves
     }
 
     /// All positions after moving a single checker once. If no move is possible it returns `None`.
@@ -101,10 +111,8 @@ impl<const N: u8> Position<N> {
     }
 
     // All moves with no checkers on the bar where two checkers can be moved.
-    fn two_checker_moves(&self, dice: &MixedDice) -> Vec<Self> {
+    fn two_checker_moves_into(&self, dice: &MixedDice, moves: &mut Vec<Self>) {
         debug_assert!(self.pips[X_BAR] == 0);
-
-        let mut moves: Vec<Self> = Vec::with_capacity(MOVES_CAPACITY);
 
         // All moves where the `small` die is moved first
         (self.smallest_pip_to_check(dice.small)..X_BAR)
@@ -147,12 +155,10 @@ impl<const N: u8> Position<N> {
                 });
             }
         });
-
-        moves
     }
 
     /// All moves (well, exactly one) when at least two checkers are on the bar.
-    fn moves_with_2_checkers_on_bar(&self, dice: &MixedDice) -> Vec<Self> {
+    fn moves_with_2_checkers_on_bar_into(&self, dice: &MixedDice, moves: &mut Vec<Self>) {
         debug_assert!(self.pips[X_BAR] > 1);
 
         let mut position = *self;
@@ -162,7 +168,7 @@ impl<const N: u8> Position<N> {
         if position.can_enter(dice.small) {
             position.enter_single_checker(dice.small);
         }
-        vec![position]
+        moves.push(position)
     }
 
     fn can_enter(&self, die: usize) -> bool {

@@ -2,7 +2,9 @@
 
 [![Build](../../actions/workflows/build.yaml/badge.svg)](../../actions/workflows/build.yaml)
 
-Bkgm is a versatile Rust crate designed to facilitate Backgammon-related operations, such as move generation, position parsing, conversion between standards, and the implementation of the [perfect hash](https://api.semanticscholar.org/CorpusID:60574812) for bearoff and hypergammon databases. It supports both traditional Backgammon and 3-checker Hypergammon and provides the foundation for building Backgammon engines or APIs.
+Bkgm is a versatile Rust crate designed to facilitate Backgammon-related operations, such as move generation, position parsing, conversion between standards, and the implementation of the [perfect hash](https://api.semanticscholar.org/CorpusID:60574812) for bearoff and hypergammon databases. It supports both traditional Backgammon and 3-checker Hypergammon.
+
+The project direction is to keep `bkgm` as a common/shared Backgammon core library that can be reused by different engines, tooling, services, and research workflows (including RL/self-play experiments), rather than tying it to one specific executable.
 
 ## Example Position
 
@@ -31,6 +33,12 @@ Position ID: 4HPwATDgc/ABMA
 -   Ability to generate possible positions.
 -   Macros to create Backgammon and Hypergammon positions.
 -   State trait implemented for both Backgammon and Hypergammon.
+
+## Performance Direction
+
+-   Move generation correctness and speed are the top priority.
+-   Benchmark-driven optimization is preferred over speculative refactors.
+-   We actively compare against strong references such as [Wildbg](https://github.com/carsten-wenderdel/wildbg).
 
 ## TODO
 

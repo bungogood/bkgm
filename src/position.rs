@@ -23,7 +23,7 @@ pub const O_BAR: usize = 0;
 /// It also helps the compiler optimizing, when this number is the same in all places.
 /// A good capacity is 128 or 256 on Apple silicon. Smaller numbers mean more reallocations.
 /// Bigger numbers mean too much memory wasted.
-const MOVES_CAPACITY: usize = 128;
+const MOVES_CAPACITY: usize = 256;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GameResult {
@@ -306,16 +306,9 @@ impl<const N: u8> State for Position<N> {
 
     /// The return values have switched the sides of the players.
     fn possible_positions(&self, dice: &Dice) -> Vec<Self> {
-        debug_assert!(self.o_off < N && self.x_off < N);
-        let mut new_positions = match dice {
-            Dice::Double(die) => self.all_positions_after_double_move(*die),
-            Dice::Mixed(dice) => self.all_positions_after_mixed_move(dice),
-        };
-        for position in new_positions.iter_mut() {
-            *position = position.flip();
-        }
-        debug_assert!(!new_positions.is_empty());
-        new_positions
+        let mut out = Vec::with_capacity(MOVES_CAPACITY);
+        self.possible_positions_in(dice, &mut out);
+        out
     }
 
     // pub fn flip(&self) -> Self {}
@@ -548,6 +541,18 @@ impl<const N: u8> fmt::Debug for Position<N> {
 
 /// Private helper methods
 impl<const N: u8> Position<N> {
+    pub fn possible_positions_in(&self, dice: &Dice, out: &mut Vec<Self>) {
+        debug_assert!(self.o_off < N && self.x_off < N);
+        match dice {
+            Dice::Double(die) => self.all_positions_after_double_move_into(*die, out),
+            Dice::Mixed(dice) => self.all_positions_after_mixed_move_into(dice, out),
+        }
+        for position in out.iter_mut() {
+            *position = position.flip();
+        }
+        debug_assert!(!out.is_empty());
+    }
+
     /// Only call if this move is legal.
     fn move_single_checker(&mut self, from: usize, die: usize) {
         self.pips[from] -= 1;
