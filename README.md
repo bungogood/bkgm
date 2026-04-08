@@ -2,19 +2,44 @@
 
 [![Build](../../actions/workflows/build.yaml/badge.svg)](../../actions/workflows/build.yaml)
 
-Bkgm is an engine-first Rust core for backgammon variants. It focuses on fast, correct move generation while still providing a user-friendly variant/game API for building bots, tools, services, and experiments.
+`bkgm` is an engine-first Rust core for backgammon and related variants.
 
-The project direction is similar to the role of `cozy-chess` in chess: a reusable high-performance core that other projects can build on top of.
+The design goal is similar to `cozy-chess` in chess: keep the core fast and reusable, while exposing a practical API for bots, duellers, analysis tools, and experiments.
 
-## API Layers
+## What You Get
 
-- Core hot path: `Position<N>` and movegen APIs (`possible_positions`, `possible_positions_in`).
-- Variant UX layer: `Variant`, `VariantSpec`, `VariantPosition`, and `Game`.
-- Presets: starting positions and built-in variants in `variants`.
+- Fast board representation with checker-count generics (`Position<N>`).
+- Variant layer (`Variant`, `VariantSpec`, `VariantPosition`, `Game`).
+- Rules-driven move generation via `PositionRules` / `VariantRules`.
+- Built-in rulesets:
+  - `ClassicRules` (current default behavior)
+  - `NoHitRules` (example alternate rules profile)
+- Position encoding support:
+  - GNUbg Position ID
+  - XGID board-part conversion (for all supported checker counts)
+  - XGID full string parse/format struct (`Xgid`)
 
-Most consumers should start with the variant/game layer and use `Position<N>` directly when they need maximum control.
+## API Shape
 
-## Quick Start (Variant/Game UX)
+### 1) Position (board data)
+
+- `Position<N>` is the board state primitive.
+- `N` is checker count (`2`, `3`, `4`, `5`, `15`, ...).
+
+### 2) Rules (move generation policy)
+
+- Move generation is exposed through rules interfaces, not raw position methods:
+  - `PositionRules<const N: u8>`
+  - `VariantRules`
+
+### 3) Game (orchestration)
+
+- `Game` stores variant + current position and offers legal/apply helpers.
+- `Game::play_episode_with::<R, _, _>(...)` supports policy-driven rollout loops.
+
+## Quick Start
+
+### Variant/Game usage
 
 ```rust
 use bkgm::{Dice, Game, Variant};
@@ -24,59 +49,68 @@ let legal = game.legal_positions(&Dice::new(3, 1));
 game.set_position(legal[0]).unwrap();
 ```
 
-## Quick Start (Core API)
+### Explicit rules usage
 
 ```rust
-use bkgm::{Dice, State};
+use bkgm::{ClassicRules, Dice, PositionRules};
 use bkgm::variants::BACKGAMMON;
 
-let mut out = Vec::with_capacity(256);
-BACKGAMMON.possible_positions_in(&Dice::new(3, 1), &mut out);
+let legal = <ClassicRules as PositionRules<15>>::legal_positions(BACKGAMMON, &Dice::new(3, 1));
 ```
 
-## Example Position
+### Alternate rules profile (`NoHitRules`)
 
-Here's a visual representation of the starting position in Backgammon:
+```rust
+use bkgm::{Dice, NoHitRules, PositionRules};
+use bkgm::variants::BACKGAMMON;
 
-```plaintext
-Position ID: 4HPwATDgc/ABMA
-┌13─14─15─16─17─18─┬───┬19─20─21─22─23─24─┬───┐
-│ X           O    │   │ O              X │   │
-│ X           O    │   │ O              X │   │
-│ X           O    │   │ O                │   │
-│ X                │   │ O                │   │
-│ X                │   │ O                │   │
-│                  │BAR│                  │OFF│
-│ O                │   │ X                │   │
-│ O                │   │ X                │   │
-│ O           X    │   │ X                │   │
-│ O           X    │   │ X              O │   │
-│ O           X    │   │ X              O │   │
-└12─11─10──9──8──7─┴───┴─6──5──4──3──2──1─┴───┘
+let legal = <NoHitRules as PositionRules<15>>::legal_positions(BACKGAMMON, &Dice::new(6, 1));
 ```
 
-## Features
+## XGID and GNUbg IDs
 
-- Support for GNUbg position IDs.
-- Fast legal move/position generation.
-- Variant presets (Backgammon, Nackgammon, Longgammon, Hypergammon variants).
-- High-level game/variant API plus low-level core API.
+- GNUbg Position ID is supported directly by `State::position_id()` / `State::from_id(...)`.
+- XGID board part:
+  - `Position::<N>::to_xgid_board()`
+  - `Position::<N>::from_xgid_board(...)`
+- Full XGID struct parse/format:
+  - `Xgid::parse(...)`
+  - `Xgid::format()`
 
-## Performance Direction
+Variant helpers:
 
-- Move generation correctness and speed are the top priority.
-- Benchmark-driven optimization is preferred over speculative refactors.
-- We actively compare against strong references such as [Wildbg](https://github.com/carsten-wenderdel/wildbg).
+- `Variant::from_xgid_board(...)`
+- `VariantPosition::xgid_board()`
 
-## TODO
+## Perft / Bench Utilities
 
-- Move parsing/notation (e.g., `24/23*/22*/21*`).
-- Expand rule-profile support for more variant families.
-- Improve test coverage and performance regression guardrails.
+`bkgm-perft` supports variants and defaults to `iterations=1`:
+
+```bash
+cargo run --release --bin bkgm-perft -- --variant backgammon --depth 4
+cargo run --release --bin bkgm-perft -- --variant hypergammon --depth 3 --weighted
+```
+
+`corpus-bench` benchmarks corpus movegen throughput.
+
+## Variant Coverage
+
+Built-in variants include:
+
+- Backgammon
+- Nackgammon
+- Longgammon
+- Hypergammon (`2`, `3`, `4`, `5` checkers)
+
+## Project Direction
+
+- Keep correctness and speed first.
+- Keep rules explicit in public move generation APIs.
+- Expand format interoperability (XGID/GNUbg and match/session context) safely.
 
 ## References
 
--   Bkgm [Documentation](https://docs.rs/bkgm/latest/bkgm)
--   Backgammon [Wikipedia](https://en.wikipedia.org/wiki/Backgammon)
--   [Wildbg](https://github.com/carsten-wenderdel/wildbg) by [Carsten Wenderdel](https://github.com/carsten-wenderdel/wildbg)
--   [Enumerating Backgammon Positions: The Perfect Hash (1997)](https://api.semanticscholar.org/CorpusID:60574812) by A. T. Benjamin and A. M. Ross
+- [docs.rs/bkgm](https://docs.rs/bkgm/latest/bkgm)
+- [Wildbg](https://github.com/carsten-wenderdel/wildbg)
+- [GNU Backgammon](https://www.gnu.org/software/gnubg/)
+- [Enumerating Backgammon Positions: The Perfect Hash (1997)](https://api.semanticscholar.org/CorpusID:60574812)
