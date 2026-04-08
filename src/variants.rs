@@ -26,7 +26,6 @@ pub enum VariantPosition {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct VariantSpec {
-    pub variant: Variant,
     pub name: &'static str,
     pub num_checkers: u8,
     pub start: VariantPosition,
@@ -36,43 +35,36 @@ impl Variant {
     pub fn spec(self) -> VariantSpec {
         match self {
             Variant::Backgammon => VariantSpec {
-                variant: self,
                 name: "Backgammon",
                 num_checkers: 15,
                 start: VariantPosition::Backgammon(BACKGAMMON),
             },
             Variant::Nackgammon => VariantSpec {
-                variant: self,
                 name: "Nackgammon",
                 num_checkers: 15,
                 start: VariantPosition::Nackgammon(NACKGAMMON),
             },
             Variant::Longgammon => VariantSpec {
-                variant: self,
                 name: "Longgammon",
                 num_checkers: 15,
                 start: VariantPosition::Longgammon(LONGGAMMON),
             },
             Variant::Hypergammon => VariantSpec {
-                variant: self,
                 name: "Hypergammon (3)",
                 num_checkers: 3,
                 start: VariantPosition::Hypergammon(HYPERGAMMON),
             },
             Variant::Hypergammon2 => VariantSpec {
-                variant: self,
                 name: "Hypergammon (2)",
                 num_checkers: 2,
                 start: VariantPosition::Hypergammon2(HYPERGAMMON2),
             },
             Variant::Hypergammon4 => VariantSpec {
-                variant: self,
                 name: "Hypergammon (4)",
                 num_checkers: 4,
                 start: VariantPosition::Hypergammon4(HYPERGAMMON4),
             },
             Variant::Hypergammon5 => VariantSpec {
-                variant: self,
                 name: "Hypergammon (5)",
                 num_checkers: 5,
                 start: VariantPosition::Hypergammon5(HYPERGAMMON5),
@@ -105,6 +97,31 @@ impl Variant {
             }
             Variant::Hypergammon5 => {
                 <Position<5> as State>::from_id(id).map(VariantPosition::Hypergammon5)
+            }
+        }
+    }
+
+    pub fn from_xgid_board(self, board: &str) -> Option<VariantPosition> {
+        match self {
+            Variant::Backgammon | Variant::Nackgammon | Variant::Longgammon => {
+                Position::<15>::from_xgid_board(board).map(|p| match self {
+                    Variant::Backgammon => VariantPosition::Backgammon(p),
+                    Variant::Nackgammon => VariantPosition::Nackgammon(p),
+                    Variant::Longgammon => VariantPosition::Longgammon(p),
+                    _ => unreachable!(),
+                })
+            }
+            Variant::Hypergammon => {
+                Position::<3>::from_xgid_board(board).map(VariantPosition::Hypergammon)
+            }
+            Variant::Hypergammon2 => {
+                Position::<2>::from_xgid_board(board).map(VariantPosition::Hypergammon2)
+            }
+            Variant::Hypergammon4 => {
+                Position::<4>::from_xgid_board(board).map(VariantPosition::Hypergammon4)
+            }
+            Variant::Hypergammon5 => {
+                Position::<5>::from_xgid_board(board).map(VariantPosition::Hypergammon5)
             }
         }
     }
@@ -220,6 +237,18 @@ impl VariantPosition {
             VariantPosition::Hypergammon2(p) => p.position_id(),
             VariantPosition::Hypergammon4(p) => p.position_id(),
             VariantPosition::Hypergammon5(p) => p.position_id(),
+        }
+    }
+
+    pub fn xgid_board(self) -> String {
+        match self {
+            VariantPosition::Backgammon(p) => p.to_xgid_board(),
+            VariantPosition::Nackgammon(p) => p.to_xgid_board(),
+            VariantPosition::Longgammon(p) => p.to_xgid_board(),
+            VariantPosition::Hypergammon(p) => p.to_xgid_board(),
+            VariantPosition::Hypergammon2(p) => p.to_xgid_board(),
+            VariantPosition::Hypergammon4(p) => p.to_xgid_board(),
+            VariantPosition::Hypergammon5(p) => p.to_xgid_board(),
         }
     }
 }
