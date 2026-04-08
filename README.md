@@ -52,19 +52,19 @@ game.set_position(legal[0]).unwrap();
 ### Explicit rules usage
 
 ```rust
-use bkgm::{ClassicRules, Dice, PositionRules};
+use bkgm::{legal_positions_with, ClassicRules, Dice};
 use bkgm::variants::BACKGAMMON;
 
-let legal = <ClassicRules as PositionRules<15>>::legal_positions(BACKGAMMON, &Dice::new(3, 1));
+let legal = legal_positions_with::<ClassicRules, 15>(BACKGAMMON, &Dice::new(3, 1));
 ```
 
 ### Alternate rules profile (`NoHitRules`)
 
 ```rust
-use bkgm::{Dice, NoHitRules, PositionRules};
+use bkgm::{legal_positions_with, Dice, NoHitRules};
 use bkgm::variants::BACKGAMMON;
 
-let legal = <NoHitRules as PositionRules<15>>::legal_positions(BACKGAMMON, &Dice::new(6, 1));
+let legal = legal_positions_with::<NoHitRules, 15>(BACKGAMMON, &Dice::new(6, 1));
 ```
 
 ## XGID and GNUbg IDs

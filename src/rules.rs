@@ -16,6 +16,17 @@ pub struct ClassicRules;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NoHitRules;
 
+pub fn legal_positions_with<R, const N: u8>(position: Position<N>, dice: &Dice) -> Vec<Position<N>>
+where
+    R: PositionRules<N>,
+{
+    R::legal_positions(position, dice)
+}
+
+pub fn legal_positions(position: VariantPosition, dice: &Dice) -> Vec<VariantPosition> {
+    <ClassicRules as VariantRules>::legal_positions(position, dice)
+}
+
 impl<const N: u8> PositionRules<N> for ClassicRules {
     fn legal_positions(position: Position<N>, dice: &Dice) -> Vec<Position<N>> {
         generate_legal_positions(position, dice)
