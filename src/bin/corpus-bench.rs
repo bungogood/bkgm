@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use bkgm::dice::ALL_21;
-use bkgm::{Position, State};
+use bkgm::{ClassicRules, Position, PositionRules, State};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
@@ -29,12 +29,10 @@ fn parse_usize_flag(args: &[String], name: &str) -> Option<usize> {
 }
 
 fn run_once(positions: &[Position<15>]) -> usize {
-    let mut out = Vec::with_capacity(256);
     let mut total = 0usize;
     for pos in positions {
         for (dice, _) in ALL_21 {
-            pos.possible_positions_in(&dice, &mut out);
-            total += out.len();
+            total += <ClassicRules as PositionRules<15>>::legal_positions(*pos, &dice).len();
         }
     }
     total

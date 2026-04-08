@@ -1,4 +1,3 @@
-use crate::dice::Dice;
 use crate::position::Position;
 use crate::position::{GamePhase, GameState, State};
 
@@ -161,46 +160,6 @@ impl VariantPosition {
             VariantPosition::Hypergammon2(p) => p.turn(),
             VariantPosition::Hypergammon4(p) => p.turn(),
             VariantPosition::Hypergammon5(p) => p.turn(),
-        }
-    }
-
-    pub fn possible_positions(self, dice: &Dice) -> Vec<Self> {
-        match self {
-            VariantPosition::Backgammon(p) => p
-                .possible_positions(dice)
-                .into_iter()
-                .map(VariantPosition::Backgammon)
-                .collect(),
-            VariantPosition::Nackgammon(p) => p
-                .possible_positions(dice)
-                .into_iter()
-                .map(VariantPosition::Nackgammon)
-                .collect(),
-            VariantPosition::Longgammon(p) => p
-                .possible_positions(dice)
-                .into_iter()
-                .map(VariantPosition::Longgammon)
-                .collect(),
-            VariantPosition::Hypergammon(p) => p
-                .possible_positions(dice)
-                .into_iter()
-                .map(VariantPosition::Hypergammon)
-                .collect(),
-            VariantPosition::Hypergammon2(p) => p
-                .possible_positions(dice)
-                .into_iter()
-                .map(VariantPosition::Hypergammon2)
-                .collect(),
-            VariantPosition::Hypergammon4(p) => p
-                .possible_positions(dice)
-                .into_iter()
-                .map(VariantPosition::Hypergammon4)
-                .collect(),
-            VariantPosition::Hypergammon5(p) => p
-                .possible_positions(dice)
-                .into_iter()
-                .map(VariantPosition::Hypergammon5)
-                .collect(),
         }
     }
 

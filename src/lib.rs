@@ -10,7 +10,7 @@ pub mod xgid;
 pub use dice::Dice;
 pub use game::Game;
 pub use position::{GameResult, GameState, Position, State, O_BAR, X_BAR};
-pub use rules::{ClassicRules, PositionRules, VariantRules};
+pub use rules::{ClassicRules, NoHitRules, PositionRules, VariantRules};
 pub use variants::*;
 pub use xgid::{Xgid, XgidBoard, XgidDice};
 

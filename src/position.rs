@@ -98,8 +98,6 @@ pub trait State: Sized + Sync + Clone + Copy + Hash + PartialEq + Eq + fmt::Debu
 
     fn flip(&self) -> Self;
 
-    fn possible_positions(&self, dice: &Dice) -> Vec<Self>;
-
     fn phase(&self) -> GamePhase;
 
     fn from_id(id: &str) -> Option<Self>;
@@ -302,13 +300,6 @@ impl<const N: u8> State for Position<N> {
                 }
             }
         }
-    }
-
-    /// The return values have switched the sides of the players.
-    fn possible_positions(&self, dice: &Dice) -> Vec<Self> {
-        let mut out = Vec::with_capacity(MOVES_CAPACITY);
-        self.possible_positions_in(dice, &mut out);
-        out
     }
 
     // pub fn flip(&self) -> Self {}
@@ -541,33 +532,6 @@ impl<const N: u8> fmt::Debug for Position<N> {
 
 /// Private helper methods
 impl<const N: u8> Position<N> {
-    pub fn possible_positions_in(&self, dice: &Dice, out: &mut Vec<Self>) {
-        debug_assert!(self.o_off < N && self.x_off < N);
-        match dice {
-            Dice::Double(die) => self.all_positions_after_double_move_into(*die, out),
-            Dice::Mixed(dice) => self.all_positions_after_mixed_move_into(dice, out),
-        }
-        for position in out.iter_mut() {
-            *position = position.flip();
-        }
-        debug_assert!(!out.is_empty());
-    }
-
-    pub fn possible_positions_len_in(&self, dice: &Dice, scratch: &mut Vec<Self>) -> usize {
-        self.possible_positions_in(dice, scratch);
-        scratch.len()
-    }
-
-    pub fn for_each_possible_position_in<F>(&self, dice: &Dice, scratch: &mut Vec<Self>, mut f: F)
-    where
-        F: FnMut(Self),
-    {
-        self.possible_positions_in(dice, scratch);
-        for &position in scratch.iter() {
-            f(position);
-        }
-    }
-
     /// Only call if this move is legal.
     fn move_single_checker(&mut self, from: usize, die: usize) {
         self.pips[from] -= 1;
@@ -664,6 +628,56 @@ impl<const N: u8> Position<N> {
         } else {
             None
         }
+    }
+}
+
+pub(crate) fn generate_legal_positions<const N: u8>(
+    position: Position<N>,
+    dice: &Dice,
+) -> Vec<Position<N>> {
+    let mut out = Vec::with_capacity(MOVES_CAPACITY);
+    generate_legal_positions_in(position, dice, &mut out);
+    out
+}
+
+pub(crate) fn generate_legal_positions_in<const N: u8>(
+    position: Position<N>,
+    dice: &Dice,
+    out: &mut Vec<Position<N>>,
+) {
+    debug_assert!(position.o_off < N && position.x_off < N);
+    match dice {
+        Dice::Double(die) => position.all_positions_after_double_move_into(*die, out),
+        Dice::Mixed(dice) => position.all_positions_after_mixed_move_into(dice, out),
+    }
+    for p in out.iter_mut() {
+        *p = p.flip();
+    }
+    debug_assert!(!out.is_empty());
+}
+
+#[cfg(test)]
+pub(crate) fn generate_legal_positions_len_in<const N: u8>(
+    position: Position<N>,
+    dice: &Dice,
+    scratch: &mut Vec<Position<N>>,
+) -> usize {
+    generate_legal_positions_in(position, dice, scratch);
+    scratch.len()
+}
+
+#[cfg(test)]
+pub(crate) fn for_each_legal_position_in<const N: u8, F>(
+    position: Position<N>,
+    dice: &Dice,
+    scratch: &mut Vec<Position<N>>,
+    mut f: F,
+) where
+    F: FnMut(Position<N>),
+{
+    generate_legal_positions_in(position, dice, scratch);
+    for &next in scratch.iter() {
+        f(next);
     }
 }
 
@@ -790,7 +804,7 @@ mod tests {
         // Given
         let pos = pos!(x X_BAR:2, 4:1, 3:1; o 24:2);
         // When
-        let positions = pos.possible_positions(&Dice::new(3, 3));
+        let positions = generate_legal_positions(pos, &Dice::new(3, 3));
         // Then
         let expected1 = pos!(x 1:2; o 6:2, 21:1, 22:1);
         let expected2 = pos!(x 1:2; o 3:1, 9:1, 21:1, 22:1);
@@ -802,7 +816,7 @@ mod tests {
     fn all_positions_after_moving_mixed() {
         let pos = pos!(x X_BAR:1; o 22:1);
         // When
-        let positions = pos.possible_positions(&Dice::new(2, 3));
+        let positions = generate_legal_positions(pos, &Dice::new(2, 3));
         // Then
         let expected1 = pos!(x X_BAR:1; o 5:1);
         let expected2 = pos!(x 3:1; o 5:1);
@@ -814,9 +828,9 @@ mod tests {
         let pos = pos!(x 24:2, 13:5, 8:3, 6:5; o 19:5, 17:3, 12:5, 1:2);
         let dice = Dice::new(3, 1);
 
-        let expected = pos.possible_positions(&dice).len();
+        let expected = generate_legal_positions(pos, &dice).len();
         let mut scratch = Vec::with_capacity(256);
-        let actual = pos.possible_positions_len_in(&dice, &mut scratch);
+        let actual = generate_legal_positions_len_in(pos, &dice, &mut scratch);
 
         assert_eq!(actual, expected);
     }
@@ -826,11 +840,11 @@ mod tests {
         let pos = pos!(x X_BAR:1, 6:4, 3:3; o 24:2, 20:2, 18:2, 1:9);
         let dice = Dice::new(5, 2);
 
-        let expected = pos.possible_positions(&dice);
+        let expected = generate_legal_positions(pos, &dice);
         let mut actual = Vec::new();
         let mut scratch = Vec::with_capacity(256);
 
-        pos.for_each_possible_position_in(&dice, &mut scratch, |next| actual.push(next));
+        for_each_legal_position_in(pos, &dice, &mut scratch, |next| actual.push(next));
 
         assert_eq!(actual, expected);
     }
@@ -1022,7 +1036,7 @@ mod tests {
             ("ABDAEBIAAAAAAA", (6, 2), 1),
         ];
         fn number_of_moves(position: &Position<15>, dice: &Dice) -> usize {
-            let all = position.possible_positions(dice);
+            let all = generate_legal_positions(*position, dice);
             if all.len() == 1 && all.first().unwrap().flip() == *position {
                 0
             } else {
