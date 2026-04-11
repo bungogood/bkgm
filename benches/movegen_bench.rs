@@ -1,7 +1,7 @@
 use bkgm::dice::ALL_21;
 use bkgm::position::{GamePhase, OngoingPhase};
 use bkgm::variants::BACKGAMMON;
-use bkgm::{Dice, Position, State};
+use bkgm::{legal_positions_with, ClassicRules, Dice, Position, State};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use mimalloc::MiMalloc;
 
@@ -12,11 +12,9 @@ const SAMPLE_POSITIONS: usize = 512;
 
 fn count_all21_moves(positions: &[Position<15>]) -> usize {
     let mut total = 0usize;
-    let mut out = Vec::with_capacity(256);
     for pos in positions {
         for (dice, _) in ALL_21 {
-            pos.possible_positions_in(&dice, &mut out);
-            total += out.len();
+            total += legal_positions_with::<ClassicRules, 15>(*pos, &dice).len();
         }
     }
     total
@@ -25,13 +23,12 @@ fn count_all21_moves(positions: &[Position<15>]) -> usize {
 fn collect_phase_positions(phase: OngoingPhase, count: usize, seed: u64) -> Vec<Position<15>> {
     let mut rng = fastrand::Rng::with_seed(seed);
     let mut out = Vec::with_capacity(count);
-    let mut scratch = Vec::with_capacity(256);
 
     while out.len() < count {
         let mut p = BACKGAMMON;
         for _ply in 0..80 {
             let (dice, _) = ALL_21[rng.usize(0..ALL_21.len())];
-            p.possible_positions_in(&dice, &mut scratch);
+            let scratch = legal_positions_with::<ClassicRules, 15>(p, &dice);
             if scratch.is_empty() {
                 break;
             }
@@ -50,13 +47,12 @@ fn collect_phase_positions(phase: OngoingPhase, count: usize, seed: u64) -> Vec<
 }
 
 fn bench_start_single_roll(c: &mut Criterion) {
-    let mut out = Vec::with_capacity(256);
     let pos = BACKGAMMON;
     let dice = Dice::new(3, 1);
 
     c.bench_function("movegen/start/single_roll_31", |b| {
         b.iter(|| {
-            pos.possible_positions_in(black_box(&dice), &mut out);
+            let out = legal_positions_with::<ClassicRules, 15>(pos, black_box(&dice));
             black_box(out.len())
         })
     });
