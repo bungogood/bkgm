@@ -184,10 +184,10 @@ pub fn encode_board_for_position<const N: u8>(position: Position<N>) -> String {
         chars[25] = b'A' + (o_bar - 1);
     }
 
-    for i in 1..=24usize {
+    for (i, ch) in chars.iter_mut().enumerate().take(25).skip(1) {
         let pip = 25 - i;
         let n = position.pip(pip);
-        chars[i] = if n > 0 {
+        *ch = if n > 0 {
             b'a' + (n as u8 - 1)
         } else if n < 0 {
             b'A' + ((-n) as u8 - 1)

@@ -26,7 +26,7 @@ pub struct MixedDice {
 /// As `usize` is also returned how often those dice on average appear in 1296 rolls.
 /// Two double rolls appear 1 time, two mixed rolls appear 4 times.
 /// A combination of a double and a mixed roll appears 2 times.
-pub const ALL_441: [([Dice; 2], usize); 441] = Dice::all_441();
+pub static ALL_441: [([Dice; 2], usize); 441] = Dice::all_441();
 
 /// Contains all 21 possibilities of dice and a number of how often they appear in 36 rolls.
 ///
