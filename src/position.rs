@@ -2,9 +2,6 @@ mod conversion;
 mod double_moves;
 mod mixed_moves;
 
-use base64::engine::general_purpose;
-use base64::Engine;
-
 use crate::dice::Dice;
 use crate::position::GameResult::*;
 use crate::position::GameState::*;
@@ -100,14 +97,6 @@ pub trait State: Sized + Sync + Clone + Copy + Hash + PartialEq + Eq + fmt::Debu
 
     fn phase(&self) -> GamePhase;
 
-    fn from_id(id: &str) -> Option<Self>;
-
-    fn position_id(&self) -> String;
-
-    fn decode(key: [u8; 10]) -> Self;
-
-    fn encode(&self) -> [u8; 10];
-
     fn game_state(&self) -> GameState {
         debug_assert!(
             self.x_off() < Self::NUM_CHECKERS || self.o_off() < Self::NUM_CHECKERS,
@@ -137,7 +126,6 @@ pub trait State: Sized + Sync + Clone + Copy + Hash + PartialEq + Eq + fmt::Debu
     fn dbhash(&self) -> usize;
 
     fn show(&self) {
-        println!("Position ID: {}", self.position_id());
         println!("┌13─14─15─16─17─18─┬───┬19─20─21─22─23─24─┬───┐");
         for row in 0..5 {
             print!("│");
@@ -321,102 +309,6 @@ impl<const N: u8> State for Position<N> {
             x_off: self.o_off,
             o_off: self.x_off,
             pips,
-        }
-    }
-
-    fn position_id(&self) -> String {
-        let key = self.encode();
-        let b64 = general_purpose::STANDARD.encode(key);
-        b64[..14].to_string()
-    }
-
-    fn from_id(id: &str) -> Option<Self> {
-        let padded_id = format!("{}==", id);
-        let key = general_purpose::STANDARD.decode(padded_id).unwrap();
-        Some(Self::decode(key.try_into().unwrap()))
-    }
-
-    fn encode(&self) -> [u8; 10] {
-        let mut key = [0u8; 10];
-        let mut bit_index = 0;
-
-        // Encoding the position for the player not on roll
-        for point in (1..=24).rev() {
-            for _ in 0..-self.pip(point) {
-                key[bit_index / 8] |= 1 << (bit_index % 8);
-                bit_index += 1; // Appending a 1
-            }
-            bit_index += 1; // Appending a 0
-        }
-        for _ in 0..self.o_bar() {
-            key[bit_index / 8] |= 1 << (bit_index % 8);
-            bit_index += 1; // Appending a 1
-        }
-        bit_index += 1; // Appending a 0
-
-        // Encoding the position for the player on roll
-        for point in 1..=24 {
-            for _ in 0..self.pip(point) {
-                key[bit_index / 8] |= 1 << (bit_index % 8);
-                bit_index += 1; // Appending a 1
-            }
-            bit_index += 1; // Appending a 0
-        }
-        for _ in 0..self.x_bar() {
-            key[bit_index / 8] |= 1 << (bit_index % 8);
-            bit_index += 1; // Appending a 1
-        }
-
-        key
-    }
-
-    fn decode(key: [u8; 10]) -> Self {
-        let mut bit_index = 0;
-        let mut pips = [0i8; 26];
-
-        let mut x_bar = 0;
-        let mut o_bar = 0;
-        let mut x_pieces = 0;
-        let mut o_pieces = 0;
-
-        for point in (0..24).rev() {
-            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-                pips[point + 1] -= 1;
-                o_pieces += 1;
-                bit_index += 1;
-            }
-            bit_index += 1; // Appending a 0
-        }
-
-        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-            o_bar += 1;
-            bit_index += 1;
-        }
-
-        bit_index += 1; // Appending a 0
-
-        for point in 0..24 {
-            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-                pips[point + 1] += 1;
-                x_pieces += 1;
-                bit_index += 1;
-            }
-            bit_index += 1; // Appending a 0
-        }
-
-        while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-            x_bar += 1;
-            bit_index += 1;
-        }
-
-        pips[X_BAR] = x_bar;
-        pips[O_BAR] = -o_bar;
-
-        Self {
-            turn: true,
-            pips,
-            x_off: N - x_pieces - x_bar as u8,
-            o_off: N - o_pieces - o_bar as u8,
         }
     }
 
@@ -1044,7 +936,7 @@ mod tests {
             }
         }
         for (id, dice, number) in positions {
-            let position = Position::<15>::from_id(id);
+            let position = crate::codecs::gnuid::decode_position::<15>(id).unwrap();
             let dice = Dice::new(dice.0, dice.1);
             assert_eq!(
                 number_of_moves(&position, &dice),

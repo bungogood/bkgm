@@ -1,6 +1,4 @@
-use crate::position::{Position, O_BAR, X_BAR};
-use base64::engine::general_purpose;
-use base64::Engine;
+use crate::position::Position;
 use std::collections::HashMap;
 
 /// Simple way to create positions for testing.
@@ -30,82 +28,7 @@ macro_rules! pos {
     };
 }
 
-/// GnuBG Position ID.
-/// Details: https://www.gnu.org/software/gnubg/manual/html_node/A-technical-description-of-the-Position-ID.html
 impl<const N: u8> Position<N> {
-    pub fn position_id(&self) -> String {
-        let key = self.encode();
-        general_purpose::STANDARD_NO_PAD.encode(key)
-    }
-
-    pub fn from_id(id: &str) -> Self {
-        let bytes = general_purpose::STANDARD_NO_PAD
-            .decode(id)
-            .expect("Position encoding expects valid id.");
-        let key: [u8; 10] = bytes
-            .try_into()
-            .expect("Position encoding expects 10 decoded bytes.");
-        Self::decode(key)
-    }
-
-    fn encode(&self) -> [u8; 10] {
-        let mut key = [0u8; 10];
-        let mut bit_index = 0;
-
-        // Encoding the position for the player not on roll
-        for point in (O_BAR..X_BAR).rev() {
-            for _ in 0..-self.pips[point] {
-                key[bit_index / 8] |= 1 << (bit_index % 8);
-                bit_index += 1; // Appending a 1
-            }
-            bit_index += 1; // Appending a 0
-        }
-
-        // Encoding the position for the player on roll
-        (O_BAR + 1..X_BAR + 1).for_each(|point| {
-            (0..self.pips[point]).for_each(|_| {
-                key[bit_index / 8] |= 1 << (bit_index % 8);
-                bit_index += 1; // Appending a 1
-            });
-            bit_index += 1; // Appending a 0
-        });
-
-        key
-    }
-
-    fn decode(key: [u8; 10]) -> Self {
-        let mut bit_index = 0;
-        let mut pips = [0i8; 26];
-
-        let mut x_pieces = 0;
-        let mut o_pieces = 0;
-
-        (O_BAR..X_BAR).rev().for_each(|point| {
-            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-                pips[point] -= 1;
-                o_pieces += 1;
-                bit_index += 1;
-            }
-            bit_index += 1; // Appending a 0
-        });
-
-        (O_BAR + 1..X_BAR + 1).for_each(|point| {
-            while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-                pips[point] += 1;
-                x_pieces += 1;
-                bit_index += 1;
-            }
-            bit_index += 1; // Appending a 0
-        });
-
-        Position {
-            turn: true,
-            pips,
-            x_off: N - x_pieces,
-            o_off: N - o_pieces,
-        }
-    }
-
     pub fn from_hash_maps(x: &HashMap<usize, u8>, o: &HashMap<usize, u8>) -> Self {
         let mut pips = [0; 26];
         for (i, v) in x {

@@ -22,12 +22,6 @@ impl Game {
         self.variant
     }
 
-    pub fn from_position_id(variant: Variant, id: &str) -> Option<Self> {
-        variant
-            .from_position_id(id)
-            .map(|position| Self { variant, position })
-    }
-
     pub fn position(&self) -> VariantPosition {
         self.position
     }

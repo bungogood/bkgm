@@ -2,8 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
 
+use bkgm::codecs::gnuid;
 use bkgm::dice::ALL_21;
-use bkgm::{ClassicRules, Position, PositionRules, State};
+use bkgm::{ClassicRules, Position, PositionRules};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
@@ -14,7 +15,7 @@ fn load_positions(path: &str) -> Vec<Position<15>> {
         .expect("could not read corpus file")
         .lines()
         .filter(|l| !l.trim().is_empty())
-        .map(|id| <Position<15> as State>::from_id(id).expect("invalid position id"))
+        .map(|id| gnuid::decode_position::<15>(id).expect("invalid position id"))
         .collect()
 }
 

@@ -1,8 +1,9 @@
 use std::env;
 use std::time::Instant;
 
+use bkgm::codecs::gnuid;
 use bkgm::dice::ALL_21;
-use bkgm::{ClassicRules, Dice, Position, PositionRules, State, Variant};
+use bkgm::{ClassicRules, Dice, Position, PositionRules, Variant};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
@@ -64,7 +65,7 @@ fn parse_variant_flag(args: &[String]) -> Variant {
 }
 
 fn default_position_id_for_variant(variant: Variant) -> String {
-    variant.start_position().position_id()
+    gnuid::encode(variant.start_position())
 }
 
 fn run_single_roll<const N: u8>(
@@ -160,7 +161,7 @@ fn main() {
 
     match variant {
         Variant::Backgammon | Variant::Nackgammon | Variant::Longgammon => {
-            let position = <Position<15> as State>::from_id(position_id.as_str())
+            let position = gnuid::decode_position::<15>(position_id.as_str())
                 .expect("invalid --position-id for selected variant");
             if let (Some(d0), Some(d1)) = (die0, die1) {
                 run_single_roll(position, variant, &position_id, d0, d1, iterations);
@@ -169,7 +170,7 @@ fn main() {
             }
         }
         Variant::Hypergammon => {
-            let position = <Position<3> as State>::from_id(position_id.as_str())
+            let position = gnuid::decode_position::<3>(position_id.as_str())
                 .expect("invalid --position-id for selected variant");
             if let (Some(d0), Some(d1)) = (die0, die1) {
                 run_single_roll(position, variant, &position_id, d0, d1, iterations);
@@ -178,7 +179,7 @@ fn main() {
             }
         }
         Variant::Hypergammon2 => {
-            let position = <Position<2> as State>::from_id(position_id.as_str())
+            let position = gnuid::decode_position::<2>(position_id.as_str())
                 .expect("invalid --position-id for selected variant");
             if let (Some(d0), Some(d1)) = (die0, die1) {
                 run_single_roll(position, variant, &position_id, d0, d1, iterations);
@@ -187,7 +188,7 @@ fn main() {
             }
         }
         Variant::Hypergammon4 => {
-            let position = <Position<4> as State>::from_id(position_id.as_str())
+            let position = gnuid::decode_position::<4>(position_id.as_str())
                 .expect("invalid --position-id for selected variant");
             if let (Some(d0), Some(d1)) = (die0, die1) {
                 run_single_roll(position, variant, &position_id, d0, d1, iterations);
@@ -196,7 +197,7 @@ fn main() {
             }
         }
         Variant::Hypergammon5 => {
-            let position = <Position<5> as State>::from_id(position_id.as_str())
+            let position = gnuid::decode_position::<5>(position_id.as_str())
                 .expect("invalid --position-id for selected variant");
             if let (Some(d0), Some(d1)) = (die0, die1) {
                 run_single_roll(position, variant, &position_id, d0, d1, iterations);

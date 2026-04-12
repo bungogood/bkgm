@@ -1,3 +1,4 @@
+use crate::dice::Dice;
 use crate::position::Position;
 use crate::position::{GamePhase, GameState, State};
 
@@ -74,56 +75,6 @@ impl Variant {
     pub fn start_position(self) -> VariantPosition {
         self.spec().start
     }
-
-    pub fn from_position_id(self, id: &str) -> Option<VariantPosition> {
-        match self {
-            Variant::Backgammon | Variant::Nackgammon | Variant::Longgammon => {
-                <Position<15> as State>::from_id(id).map(|p| match self {
-                    Variant::Backgammon => VariantPosition::Backgammon(p),
-                    Variant::Nackgammon => VariantPosition::Nackgammon(p),
-                    Variant::Longgammon => VariantPosition::Longgammon(p),
-                    _ => unreachable!(),
-                })
-            }
-            Variant::Hypergammon => {
-                <Position<3> as State>::from_id(id).map(VariantPosition::Hypergammon)
-            }
-            Variant::Hypergammon2 => {
-                <Position<2> as State>::from_id(id).map(VariantPosition::Hypergammon2)
-            }
-            Variant::Hypergammon4 => {
-                <Position<4> as State>::from_id(id).map(VariantPosition::Hypergammon4)
-            }
-            Variant::Hypergammon5 => {
-                <Position<5> as State>::from_id(id).map(VariantPosition::Hypergammon5)
-            }
-        }
-    }
-
-    pub fn from_xgid_board(self, board: &str) -> Option<VariantPosition> {
-        match self {
-            Variant::Backgammon | Variant::Nackgammon | Variant::Longgammon => {
-                Position::<15>::from_xgid_board(board).map(|p| match self {
-                    Variant::Backgammon => VariantPosition::Backgammon(p),
-                    Variant::Nackgammon => VariantPosition::Nackgammon(p),
-                    Variant::Longgammon => VariantPosition::Longgammon(p),
-                    _ => unreachable!(),
-                })
-            }
-            Variant::Hypergammon => {
-                Position::<3>::from_xgid_board(board).map(VariantPosition::Hypergammon)
-            }
-            Variant::Hypergammon2 => {
-                Position::<2>::from_xgid_board(board).map(VariantPosition::Hypergammon2)
-            }
-            Variant::Hypergammon4 => {
-                Position::<4>::from_xgid_board(board).map(VariantPosition::Hypergammon4)
-            }
-            Variant::Hypergammon5 => {
-                Position::<5>::from_xgid_board(board).map(VariantPosition::Hypergammon5)
-            }
-        }
-    }
 }
 
 impl VariantPosition {
@@ -187,28 +138,16 @@ impl VariantPosition {
         }
     }
 
-    pub fn position_id(self) -> String {
-        match self {
-            VariantPosition::Backgammon(p) => p.position_id(),
-            VariantPosition::Nackgammon(p) => p.position_id(),
-            VariantPosition::Longgammon(p) => p.position_id(),
-            VariantPosition::Hypergammon(p) => p.position_id(),
-            VariantPosition::Hypergammon2(p) => p.position_id(),
-            VariantPosition::Hypergammon4(p) => p.position_id(),
-            VariantPosition::Hypergammon5(p) => p.position_id(),
-        }
+    pub fn legal_moves(self, dice: Dice) -> Result<Vec<(String, VariantPosition)>, String> {
+        crate::codecs::move_text::legal(self, dice)
     }
 
-    pub fn xgid_board(self) -> String {
-        match self {
-            VariantPosition::Backgammon(p) => p.to_xgid_board(),
-            VariantPosition::Nackgammon(p) => p.to_xgid_board(),
-            VariantPosition::Longgammon(p) => p.to_xgid_board(),
-            VariantPosition::Hypergammon(p) => p.to_xgid_board(),
-            VariantPosition::Hypergammon2(p) => p.to_xgid_board(),
-            VariantPosition::Hypergammon4(p) => p.to_xgid_board(),
-            VariantPosition::Hypergammon5(p) => p.to_xgid_board(),
-        }
+    pub fn encode_move(self, next: VariantPosition, dice: Dice) -> Result<String, String> {
+        crate::codecs::move_text::encode(self, next, dice)
+    }
+
+    pub fn apply_move(self, dice: Dice, text: &str) -> Option<VariantPosition> {
+        crate::codecs::move_text::apply(self, dice, text)
     }
 }
 

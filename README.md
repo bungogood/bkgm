@@ -18,6 +18,13 @@ The design goal is similar to `cozy-chess` in chess: keep the core fast and reus
   - GNUbg Position ID
   - XGID board-part conversion (for all supported checker counts)
   - XGID full string parse/format struct (`Xgid`)
+- UBGI/FIBS move-text helpers:
+  - `legal_moves`, `encode_move`, `apply_move`, `normalize_move_text`
+- Unified codec namespace:
+  - `bkgm::codecs::gnuid`
+  - `bkgm::codecs::xgid`
+  - `bkgm::codecs::fibs`
+  - `bkgm::codecs::move_text`
 
 ## API Shape
 
@@ -69,18 +76,12 @@ let legal = legal_positions_with::<NoHitRules, 15>(BACKGAMMON, &Dice::new(6, 1))
 
 ## XGID and GNUbg IDs
 
-- GNUbg Position ID is supported directly by `State::position_id()` / `State::from_id(...)`.
-- XGID board part:
-  - `Position::<N>::to_xgid_board()`
-  - `Position::<N>::from_xgid_board(...)`
-- Full XGID struct parse/format:
-  - `Xgid::parse(...)`
-  - `Xgid::format()`
-
-Variant helpers:
-
-- `Variant::from_xgid_board(...)`
-- `VariantPosition::xgid_board()`
+- GNUbg Position ID codec:
+  - `bkgm::codecs::gnuid::{encode, decode, encode_position, decode_position}`
+- XGID codec:
+  - `bkgm::codecs::xgid::{encode_board, decode_board, parse, format}`
+- FIBS codec:
+  - `bkgm::codecs::fibs::{encode_board, decode_board, normalize_move, encode_move, apply_move}`
 
 ## Perft / Bench Utilities
 
