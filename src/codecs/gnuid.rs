@@ -95,9 +95,9 @@ pub fn decode_key<const N: u8>(key: [u8; 10]) -> Position<N> {
     }
     bit_index += 1;
 
-    for point in O_BAR + 1..X_BAR {
+    for pip in pips.iter_mut().take(X_BAR).skip(O_BAR + 1) {
         while (key[bit_index / 8] >> (bit_index % 8)) & 1 == 1 {
-            pips[point] += 1;
+            *pip += 1;
             x_pieces += 1;
             bit_index += 1;
         }

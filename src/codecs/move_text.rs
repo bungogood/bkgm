@@ -45,7 +45,7 @@ pub fn normalize(text: &str) -> Option<String> {
     }
     let mut steps: Vec<String> = Vec::new();
     for token in text.split_whitespace() {
-        let cleaned = token.replace('*', "").replace(',', "");
+        let cleaned = token.replace(['*', ','], "");
         let parts: Vec<&str> = cleaned.split('/').collect();
         let points = parse_path_points(&parts)?;
         for pair in points.windows(2) {
@@ -223,7 +223,7 @@ fn collect_paths<const N: u8>(
     for from in 1..=25 {
         if let Some(next) = current.try_move_single_checker(from, die) {
             found_any = true;
-            let to = if from > die { from - die } else { 0 };
+            let to = from.saturating_sub(die);
             steps.push(Step { from, to });
             collect_paths(
                 next,
