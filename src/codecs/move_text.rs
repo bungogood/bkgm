@@ -1,9 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
-
-use crate::codecs::gnuid;
 use crate::dice::Dice;
 use crate::rules::{legal_positions_with, ClassicRules};
 use crate::{Position, State, VariantPosition};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy)]
 struct Step {
@@ -31,12 +29,80 @@ pub fn encode(
     next_position: VariantPosition,
     dice: Dice,
 ) -> Result<String, String> {
-    for (mv, child) in legal(position, dice)? {
-        if gnuid::encode(child) == gnuid::encode(next_position) {
-            return Ok(mv);
+    match (position, next_position) {
+        (VariantPosition::Backgammon(start), VariantPosition::Backgammon(next)) => {
+            encode_for(start, next, dice)
+        }
+        (VariantPosition::Nackgammon(start), VariantPosition::Nackgammon(next)) => {
+            encode_for(start, next, dice)
+        }
+        (VariantPosition::Longgammon(start), VariantPosition::Longgammon(next)) => {
+            encode_for(start, next, dice)
+        }
+        (VariantPosition::Hypergammon(start), VariantPosition::Hypergammon(next)) => {
+            encode_for(start, next, dice)
+        }
+        (VariantPosition::Hypergammon2(start), VariantPosition::Hypergammon2(next)) => {
+            encode_for(start, next, dice)
+        }
+        (VariantPosition::Hypergammon4(start), VariantPosition::Hypergammon4(next)) => {
+            encode_for(start, next, dice)
+        }
+        (VariantPosition::Hypergammon5(start), VariantPosition::Hypergammon5(next)) => {
+            encode_for(start, next, dice)
+        }
+        _ => Err("variant mismatch while encoding move".to_string()),
+    }
+}
+
+fn encode_for<const N: u8>(
+    start: Position<N>,
+    next: Position<N>,
+    dice: Dice,
+) -> Result<String, String> {
+    let target_after_steps = next.flip();
+    let mut steps = Vec::new();
+
+    for order in die_orders(dice) {
+        steps.clear();
+        if find_steps_for_target(start, &order, 0, target_after_steps, &mut steps) {
+            return Ok(format_steps(&steps));
         }
     }
+
     Err("failed to derive move text from legal child".to_string())
+}
+
+fn find_steps_for_target<const N: u8>(
+    current: Position<N>,
+    order: &[usize],
+    die_idx: usize,
+    target: Position<N>,
+    steps: &mut Vec<Step>,
+) -> bool {
+    if die_idx == order.len() {
+        return current == target;
+    }
+
+    let die = order[die_idx];
+    let mut moved_any = false;
+    for from in 1..=25 {
+        if let Some(next) = current.try_move_single_checker(from, die) {
+            moved_any = true;
+            let to = from.saturating_sub(die);
+            steps.push(Step { from, to });
+            if find_steps_for_target(next, order, die_idx + 1, target, steps) {
+                return true;
+            }
+            steps.pop();
+        }
+    }
+
+    if !moved_any {
+        return find_steps_for_target(current, order, die_idx + 1, target, steps);
+    }
+
+    false
 }
 
 pub fn normalize(text: &str) -> Option<String> {
@@ -89,36 +155,26 @@ fn legal_for<const N: u8>(
     wrap: fn(Position<N>) -> VariantPosition,
 ) -> Result<Vec<(String, VariantPosition)>, String> {
     let legal = legal_positions_with::<ClassicRules, N>(start, &dice);
-    let legal_ids: BTreeSet<String> = legal.iter().map(|p| gnuid::encode(wrap(*p))).collect();
-    let mut move_by_child: BTreeMap<String, String> = BTreeMap::new();
+    let legal_set: HashSet<Position<N>> = legal.iter().copied().collect();
+    let mut move_by_child: HashMap<Position<N>, String> = HashMap::new();
 
     for order in die_orders(dice) {
         let mut steps = Vec::new();
-        collect_paths(
-            start,
-            &order,
-            0,
-            &mut steps,
-            &legal_ids,
-            &mut move_by_child,
-            wrap,
-        );
+        collect_paths(start, &order, 0, &mut steps, &legal_set, &mut move_by_child);
         let mut steps_flipped = Vec::new();
         collect_paths(
             start.flip(),
             &order,
             0,
             &mut steps_flipped,
-            &legal_ids,
+            &legal_set,
             &mut move_by_child,
-            wrap,
         );
     }
 
     let mut out = Vec::with_capacity(legal.len());
     for child in legal {
-        let id = gnuid::encode(wrap(child));
-        if let Some(mv) = move_by_child.get(&id) {
+        if let Some(mv) = move_by_child.get(&child) {
             out.push((mv.clone(), wrap(child)));
         }
     }
@@ -199,21 +255,18 @@ fn collect_paths<const N: u8>(
     order: &[usize],
     die_idx: usize,
     steps: &mut Vec<Step>,
-    legal_ids: &BTreeSet<String>,
-    move_by_child: &mut BTreeMap<String, String>,
-    wrap: fn(Position<N>) -> VariantPosition,
+    legal_set: &HashSet<Position<N>>,
+    move_by_child: &mut HashMap<Position<N>, String>,
 ) {
     if die_idx == order.len() {
         let child = current.flip();
-        let child_id = gnuid::encode(wrap(child));
-        if legal_ids.contains(&child_id) {
+        if legal_set.contains(&child) {
             let mv = format_steps(steps);
-            move_by_child.entry(child_id).or_insert(mv);
+            move_by_child.entry(child).or_insert(mv);
         }
-        let direct_id = gnuid::encode(wrap(current));
-        if legal_ids.contains(&direct_id) {
+        if legal_set.contains(&current) {
             let mv = format_steps(steps);
-            move_by_child.entry(direct_id).or_insert(mv);
+            move_by_child.entry(current).or_insert(mv);
         }
         return;
     }
@@ -225,28 +278,12 @@ fn collect_paths<const N: u8>(
             found_any = true;
             let to = from.saturating_sub(die);
             steps.push(Step { from, to });
-            collect_paths(
-                next,
-                order,
-                die_idx + 1,
-                steps,
-                legal_ids,
-                move_by_child,
-                wrap,
-            );
+            collect_paths(next, order, die_idx + 1, steps, legal_set, move_by_child);
             steps.pop();
         }
     }
     if !found_any {
-        collect_paths(
-            current,
-            order,
-            die_idx + 1,
-            steps,
-            legal_ids,
-            move_by_child,
-            wrap,
-        );
+        collect_paths(current, order, die_idx + 1, steps, legal_set, move_by_child);
     }
 }
 
