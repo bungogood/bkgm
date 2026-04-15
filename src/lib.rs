@@ -4,6 +4,7 @@ pub mod dice_gen;
 pub mod game;
 pub mod position;
 pub mod rules;
+pub mod ubgi;
 pub mod utils;
 pub mod variants;
 
