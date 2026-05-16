@@ -1,6 +1,8 @@
 use crate::dice::Dice;
 use crate::position::Position;
 use crate::position::{GamePhase, GameState, State};
+use core::fmt;
+use core::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Variant {
@@ -11,6 +13,48 @@ pub enum Variant {
     Hypergammon2,
     Hypergammon4,
     Hypergammon5,
+}
+
+pub const VARIANTS: &[Variant] = &[
+    Variant::Backgammon,
+    Variant::Nackgammon,
+    Variant::Longgammon,
+    Variant::Hypergammon,
+    Variant::Hypergammon2,
+    Variant::Hypergammon4,
+    Variant::Hypergammon5,
+];
+
+impl fmt::Display for Variant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Variant::Backgammon => "backgammon",
+            Variant::Nackgammon => "nackgammon",
+            Variant::Longgammon => "longgammon",
+            Variant::Hypergammon => "hypergammon",
+            Variant::Hypergammon2 => "hypergammon2",
+            Variant::Hypergammon4 => "hypergammon4",
+            Variant::Hypergammon5 => "hypergammon5",
+        };
+        f.write_str(s)
+    }
+}
+
+impl FromStr for Variant {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "backgammon" => Ok(Variant::Backgammon),
+            "nackgammon" => Ok(Variant::Nackgammon),
+            "longgammon" => Ok(Variant::Longgammon),
+            "hypergammon" => Ok(Variant::Hypergammon),
+            "hypergammon2" => Ok(Variant::Hypergammon2),
+            "hypergammon4" => Ok(Variant::Hypergammon4),
+            "hypergammon5" => Ok(Variant::Hypergammon5),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

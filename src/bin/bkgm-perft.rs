@@ -52,14 +52,18 @@ fn parse_variant_flag(args: &[String]) -> Variant {
         .map(|w| w[1].to_ascii_lowercase())
         .unwrap_or_else(|| "backgammon".to_string());
 
+    if let Ok(v) = raw.parse::<Variant>() {
+        return v;
+    }
+
     match raw.as_str() {
-        "backgammon" | "bg" => Variant::Backgammon,
-        "nackgammon" | "nack" => Variant::Nackgammon,
-        "longgammon" | "long" => Variant::Longgammon,
-        "hypergammon" | "hyper" | "hypergammon3" => Variant::Hypergammon,
-        "hypergammon2" | "hyper2" => Variant::Hypergammon2,
-        "hypergammon4" | "hyper4" => Variant::Hypergammon4,
-        "hypergammon5" | "hyper5" => Variant::Hypergammon5,
+        "bg" => Variant::Backgammon,
+        "nack" => Variant::Nackgammon,
+        "long" => Variant::Longgammon,
+        "hyper" | "hypergammon3" => Variant::Hypergammon,
+        "hyper2" => Variant::Hypergammon2,
+        "hyper4" => Variant::Hypergammon4,
+        "hyper5" => Variant::Hypergammon5,
         _ => panic!("invalid --variant '{}'", raw),
     }
 }
