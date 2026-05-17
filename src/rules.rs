@@ -36,34 +36,34 @@ impl<const N: u8> PositionRules<N> for ClassicRules {
 impl VariantRules for ClassicRules {
     fn legal_positions(position: VariantPosition, dice: &Dice) -> Vec<VariantPosition> {
         match position {
-            VariantPosition::Backgammon(p) => generate_legal_positions(p, dice)
-                .into_iter()
-                .map(VariantPosition::Backgammon)
-                .collect(),
-            VariantPosition::Nackgammon(p) => generate_legal_positions(p, dice)
-                .into_iter()
-                .map(VariantPosition::Nackgammon)
-                .collect(),
-            VariantPosition::Longgammon(p) => generate_legal_positions(p, dice)
-                .into_iter()
-                .map(VariantPosition::Longgammon)
-                .collect(),
-            VariantPosition::Hypergammon(p) => generate_legal_positions(p, dice)
-                .into_iter()
-                .map(VariantPosition::Hypergammon)
-                .collect(),
-            VariantPosition::Hypergammon2(p) => generate_legal_positions(p, dice)
-                .into_iter()
-                .map(VariantPosition::Hypergammon2)
-                .collect(),
-            VariantPosition::Hypergammon4(p) => generate_legal_positions(p, dice)
-                .into_iter()
-                .map(VariantPosition::Hypergammon4)
-                .collect(),
-            VariantPosition::Hypergammon5(p) => generate_legal_positions(p, dice)
-                .into_iter()
-                .map(VariantPosition::Hypergammon5)
-                .collect(),
+            VariantPosition::Backgammon(p) => map_variant_positions(
+                generate_legal_positions(p, dice),
+                VariantPosition::Backgammon,
+            ),
+            VariantPosition::Nackgammon(p) => map_variant_positions(
+                generate_legal_positions(p, dice),
+                VariantPosition::Nackgammon,
+            ),
+            VariantPosition::Longgammon(p) => map_variant_positions(
+                generate_legal_positions(p, dice),
+                VariantPosition::Longgammon,
+            ),
+            VariantPosition::Hypergammon(p) => map_variant_positions(
+                generate_legal_positions(p, dice),
+                VariantPosition::Hypergammon,
+            ),
+            VariantPosition::Hypergammon2(p) => map_variant_positions(
+                generate_legal_positions(p, dice),
+                VariantPosition::Hypergammon2,
+            ),
+            VariantPosition::Hypergammon4(p) => map_variant_positions(
+                generate_legal_positions(p, dice),
+                VariantPosition::Hypergammon4,
+            ),
+            VariantPosition::Hypergammon5(p) => map_variant_positions(
+                generate_legal_positions(p, dice),
+                VariantPosition::Hypergammon5,
+            ),
         }
     }
 }
@@ -84,50 +84,43 @@ impl<const N: u8> PositionRules<N> for NoHitRules {
 impl VariantRules for NoHitRules {
     fn legal_positions(position: VariantPosition, dice: &Dice) -> Vec<VariantPosition> {
         match position {
-            VariantPosition::Backgammon(p) => {
-                <NoHitRules as PositionRules<15>>::legal_positions(p, dice)
-                    .into_iter()
-                    .map(VariantPosition::Backgammon)
-                    .collect()
-            }
-            VariantPosition::Nackgammon(p) => {
-                <NoHitRules as PositionRules<15>>::legal_positions(p, dice)
-                    .into_iter()
-                    .map(VariantPosition::Nackgammon)
-                    .collect()
-            }
-            VariantPosition::Longgammon(p) => {
-                <NoHitRules as PositionRules<15>>::legal_positions(p, dice)
-                    .into_iter()
-                    .map(VariantPosition::Longgammon)
-                    .collect()
-            }
-            VariantPosition::Hypergammon(p) => {
-                <NoHitRules as PositionRules<3>>::legal_positions(p, dice)
-                    .into_iter()
-                    .map(VariantPosition::Hypergammon)
-                    .collect()
-            }
-            VariantPosition::Hypergammon2(p) => {
-                <NoHitRules as PositionRules<2>>::legal_positions(p, dice)
-                    .into_iter()
-                    .map(VariantPosition::Hypergammon2)
-                    .collect()
-            }
-            VariantPosition::Hypergammon4(p) => {
-                <NoHitRules as PositionRules<4>>::legal_positions(p, dice)
-                    .into_iter()
-                    .map(VariantPosition::Hypergammon4)
-                    .collect()
-            }
-            VariantPosition::Hypergammon5(p) => {
-                <NoHitRules as PositionRules<5>>::legal_positions(p, dice)
-                    .into_iter()
-                    .map(VariantPosition::Hypergammon5)
-                    .collect()
-            }
+            VariantPosition::Backgammon(p) => map_variant_positions(
+                <NoHitRules as PositionRules<15>>::legal_positions(p, dice),
+                VariantPosition::Backgammon,
+            ),
+            VariantPosition::Nackgammon(p) => map_variant_positions(
+                <NoHitRules as PositionRules<15>>::legal_positions(p, dice),
+                VariantPosition::Nackgammon,
+            ),
+            VariantPosition::Longgammon(p) => map_variant_positions(
+                <NoHitRules as PositionRules<15>>::legal_positions(p, dice),
+                VariantPosition::Longgammon,
+            ),
+            VariantPosition::Hypergammon(p) => map_variant_positions(
+                <NoHitRules as PositionRules<3>>::legal_positions(p, dice),
+                VariantPosition::Hypergammon,
+            ),
+            VariantPosition::Hypergammon2(p) => map_variant_positions(
+                <NoHitRules as PositionRules<2>>::legal_positions(p, dice),
+                VariantPosition::Hypergammon2,
+            ),
+            VariantPosition::Hypergammon4(p) => map_variant_positions(
+                <NoHitRules as PositionRules<4>>::legal_positions(p, dice),
+                VariantPosition::Hypergammon4,
+            ),
+            VariantPosition::Hypergammon5(p) => map_variant_positions(
+                <NoHitRules as PositionRules<5>>::legal_positions(p, dice),
+                VariantPosition::Hypergammon5,
+            ),
         }
     }
+}
+
+fn map_variant_positions<const N: u8>(
+    positions: Vec<Position<N>>,
+    wrap: fn(Position<N>) -> VariantPosition,
+) -> Vec<VariantPosition> {
+    positions.into_iter().map(wrap).collect()
 }
 
 #[cfg(test)]

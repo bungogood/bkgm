@@ -168,7 +168,9 @@ pub fn parse_board(input: &str) -> Option<XgidBoard> {
 }
 
 pub fn format_board(board: XgidBoard) -> String {
-    String::from_utf8(board.bytes().to_vec()).expect("board bytes must be ascii")
+    std::str::from_utf8(&board.bytes())
+        .expect("board bytes must be ascii")
+        .to_owned()
 }
 
 pub fn encode_board_for_position<const N: u8>(position: Position<N>) -> String {
@@ -196,7 +198,9 @@ pub fn encode_board_for_position<const N: u8>(position: Position<N>) -> String {
         };
     }
 
-    String::from_utf8(chars.to_vec()).expect("xgid board bytes must be ascii")
+    std::str::from_utf8(&chars)
+        .expect("xgid board bytes must be ascii")
+        .to_owned()
 }
 
 pub fn decode_board_for_position<const N: u8>(board: &str) -> Option<Position<N>> {

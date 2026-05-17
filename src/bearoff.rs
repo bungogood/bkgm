@@ -1,3 +1,1 @@
-struct RacePos {
-    // 7
-}
+// Placeholder for future bearoff/race database support.

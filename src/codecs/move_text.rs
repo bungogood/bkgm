@@ -9,19 +9,30 @@ pub struct MoveStep {
     pub to: usize,
 }
 
+pub fn legal_steps(
+    position: VariantPosition,
+    dice: Dice,
+) -> Result<Vec<(Vec<MoveStep>, VariantPosition)>, String> {
+    match position {
+        VariantPosition::Backgammon(p) => legal_for_steps(p, dice, VariantPosition::Backgammon),
+        VariantPosition::Nackgammon(p) => legal_for_steps(p, dice, VariantPosition::Nackgammon),
+        VariantPosition::Longgammon(p) => legal_for_steps(p, dice, VariantPosition::Longgammon),
+        VariantPosition::Hypergammon(p) => legal_for_steps(p, dice, VariantPosition::Hypergammon),
+        VariantPosition::Hypergammon2(p) => legal_for_steps(p, dice, VariantPosition::Hypergammon2),
+        VariantPosition::Hypergammon4(p) => legal_for_steps(p, dice, VariantPosition::Hypergammon4),
+        VariantPosition::Hypergammon5(p) => legal_for_steps(p, dice, VariantPosition::Hypergammon5),
+    }
+}
+
 pub fn legal(
     position: VariantPosition,
     dice: Dice,
 ) -> Result<Vec<(String, VariantPosition)>, String> {
-    match position {
-        VariantPosition::Backgammon(p) => legal_for(p, dice, VariantPosition::Backgammon),
-        VariantPosition::Nackgammon(p) => legal_for(p, dice, VariantPosition::Nackgammon),
-        VariantPosition::Longgammon(p) => legal_for(p, dice, VariantPosition::Longgammon),
-        VariantPosition::Hypergammon(p) => legal_for(p, dice, VariantPosition::Hypergammon),
-        VariantPosition::Hypergammon2(p) => legal_for(p, dice, VariantPosition::Hypergammon2),
-        VariantPosition::Hypergammon4(p) => legal_for(p, dice, VariantPosition::Hypergammon4),
-        VariantPosition::Hypergammon5(p) => legal_for(p, dice, VariantPosition::Hypergammon5),
-    }
+    let with_steps = legal_steps(position, dice)?;
+    Ok(with_steps
+        .into_iter()
+        .map(|(steps, pos)| (format_move_steps(&steps), pos))
+        .collect())
 }
 
 pub fn encode(
@@ -158,14 +169,14 @@ pub fn apply(position: VariantPosition, dice: Dice, text: &str) -> Option<Varian
     }
 }
 
-fn legal_for<const N: u8>(
+fn legal_for_steps<const N: u8>(
     start: Position<N>,
     dice: Dice,
     wrap: fn(Position<N>) -> VariantPosition,
-) -> Result<Vec<(String, VariantPosition)>, String> {
+) -> Result<Vec<(Vec<MoveStep>, VariantPosition)>, String> {
     let legal = legal_positions_with::<ClassicRules, N>(start, &dice);
     let legal_set: HashSet<Position<N>> = legal.iter().copied().collect();
-    let mut move_by_child: HashMap<Position<N>, String> = HashMap::new();
+    let mut move_by_child: HashMap<Position<N>, Vec<MoveStep>> = HashMap::new();
 
     for order in die_orders(dice) {
         let mut steps = Vec::new();
@@ -183,8 +194,8 @@ fn legal_for<const N: u8>(
 
     let mut out = Vec::with_capacity(legal.len());
     for child in legal {
-        if let Some(mv) = move_by_child.get(&child) {
-            out.push((mv.clone(), wrap(child)));
+        if let Some(steps) = move_by_child.get(&child) {
+            out.push((steps.clone(), wrap(child)));
         }
     }
     Ok(out)
@@ -193,13 +204,15 @@ fn legal_for<const N: u8>(
 fn apply_for<const N: u8>(position: Position<N>, dice: Dice, text: &str) -> Option<Position<N>> {
     let normalized = normalize(text)?;
     let steps = parse_move_steps(&normalized)?;
-    let mut remaining = match dice {
-        Dice::Double(d) => vec![d, d, d, d],
-        Dice::Mixed(m) => vec![m.big(), m.small()],
+    let (dice_buf, dice_len) = match dice {
+        Dice::Double(d) => ([d, d, d, d], 4usize),
+        Dice::Mixed(m) => ([m.big(), m.small(), 0, 0], 2usize),
     };
-    let current = apply_steps(position, &steps, &mut remaining)?;
-    if remaining.iter().any(|d| any_move_for_die(current, *d)) {
-        return None;
+    let (current, used_mask) = apply_steps(position, &steps, &dice_buf, dice_len, 0)?;
+    for (idx, die) in dice_buf.iter().enumerate().take(dice_len) {
+        if (used_mask & (1 << idx)) == 0 && any_move_for_die(current, *die) {
+            return None;
+        }
     }
     Some(current.flip())
 }
@@ -207,23 +220,28 @@ fn apply_for<const N: u8>(position: Position<N>, dice: Dice, text: &str) -> Opti
 fn apply_steps<const N: u8>(
     current: Position<N>,
     steps: &[MoveStep],
-    remaining: &mut Vec<usize>,
-) -> Option<Position<N>> {
+    dice: &[usize; 4],
+    dice_len: usize,
+    used_mask: u8,
+) -> Option<(Position<N>, u8)> {
     if steps.is_empty() {
-        return Some(current);
+        return Some((current, used_mask));
     }
     let step = steps[0];
-    for idx in 0..remaining.len() {
-        let die = remaining[idx];
+    for idx in 0..dice_len {
+        if (used_mask & (1 << idx)) != 0 {
+            continue;
+        }
+        let die = dice[idx];
         if !step_matches_die(step, die) {
             continue;
         }
         if let Some(next) = current.try_move_single_checker(step.from, die) {
-            let removed = remaining.remove(idx);
-            if let Some(done) = apply_steps(next, &steps[1..], remaining) {
+            if let Some(done) =
+                apply_steps(next, &steps[1..], dice, dice_len, used_mask | (1 << idx))
+            {
                 return Some(done);
             }
-            remaining.insert(idx, removed);
         }
     }
     None
@@ -265,17 +283,17 @@ fn collect_paths<const N: u8>(
     die_idx: usize,
     steps: &mut Vec<MoveStep>,
     legal_set: &HashSet<Position<N>>,
-    move_by_child: &mut HashMap<Position<N>, String>,
+    move_by_child: &mut HashMap<Position<N>, Vec<MoveStep>>,
 ) {
     if die_idx == order.len() {
         let child = current.flip();
         if legal_set.contains(&child) {
-            let mv = format_move_steps(steps);
-            move_by_child.entry(child).or_insert(mv);
+            move_by_child.entry(child).or_insert_with(|| steps.clone());
         }
         if legal_set.contains(&current) {
-            let mv = format_move_steps(steps);
-            move_by_child.entry(current).or_insert(mv);
+            move_by_child
+                .entry(current)
+                .or_insert_with(|| steps.clone());
         }
         return;
     }
@@ -376,7 +394,7 @@ fn die_orders(dice: Dice) -> Vec<Vec<usize>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply, encode, legal, normalize};
+    use super::{apply, encode, format_move_steps, legal, legal_steps, normalize};
     use crate::codecs::gnuid;
     use crate::dice::Dice;
     use crate::{Game, Variant};
@@ -433,6 +451,22 @@ mod tests {
             let mv = encode(position, child, dice).expect("child should be encodable");
             let applied = apply(position, dice, &mv).expect("encoded move should apply");
             assert_eq!(gnuid::encode(applied), gnuid::encode(child));
+        }
+    }
+
+    #[test]
+    fn legal_steps_match_legal_text() {
+        let game = Game::new(Variant::Backgammon);
+        let dice = Dice::new(6, 1);
+        let text_moves = legal(game.position(), dice).unwrap();
+        let step_moves = legal_steps(game.position(), dice).unwrap();
+        let rendered: Vec<(String, _)> = step_moves
+            .into_iter()
+            .map(|(steps, pos)| (format_move_steps(&steps), pos))
+            .collect();
+        assert_eq!(text_moves.len(), rendered.len());
+        for (mv, child) in text_moves {
+            assert!(rendered.iter().any(|(m, c)| m == &mv && c == &child));
         }
     }
 }

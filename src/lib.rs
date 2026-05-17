@@ -12,8 +12,8 @@ pub mod variants;
 
 pub use codecs::move_text::{
     apply as apply_move, encode as encode_move, encode_steps as encode_move_steps,
-    format_move_steps, legal as legal_moves, normalize as normalize_move_text, parse_move_steps,
-    MoveStep,
+    format_move_steps, legal as legal_moves, legal_steps as legal_move_steps,
+    normalize as normalize_move_text, parse_move_steps, MoveStep,
 };
 pub use codecs::xgid::{Xgid, XgidBoard, XgidDice};
 pub use dice::Dice;

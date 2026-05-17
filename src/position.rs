@@ -382,42 +382,42 @@ impl<const N: u8> TryFrom<[i8; 26]> for Position<N> {
 
 impl<const N: u8> fmt::Debug for Position<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Position:").unwrap();
+        writeln!(f, "Position:")?;
 
         // Write x:
         let mut s = String::from("x: {");
         if self.pips[X_BAR] > 0 {
-            write!(s, "bar:{}, ", self.pips[X_BAR]).unwrap();
+            write!(s, "bar:{}, ", self.pips[X_BAR])?;
         }
         for i in (1..X_BAR).rev() {
             if self.pips[i] > 0 {
-                write!(s, "{}:{}, ", i, self.pips[i]).unwrap();
+                write!(s, "{}:{}, ", i, self.pips[i])?;
             }
         }
         if self.x_off > 0 {
-            write!(s, "off:{}, ", self.x_off).unwrap();
+            write!(s, "off:{}, ", self.x_off)?;
         }
         s.pop(); // remove last ", "
         s.pop();
-        writeln!(s, "}}").unwrap();
-        write!(f, "{}", s).unwrap();
+        writeln!(s, "}}")?;
+        write!(f, "{}", s)?;
 
         // Write o:
         let mut s = String::from("o: {");
         if self.o_off > 0 {
-            write!(s, "off:{}, ", self.o_off).unwrap();
+            write!(s, "off:{}, ", self.o_off)?;
         }
         for i in (1..X_BAR).rev() {
             if self.pips[i] < 0 {
-                write!(s, "{}:{}, ", i, -self.pips[i]).unwrap();
+                write!(s, "{}:{}, ", i, -self.pips[i])?;
             }
         }
         if self.pips[O_BAR] < 0 {
-            write!(s, "bar:{}, ", -self.pips[O_BAR]).unwrap();
+            write!(s, "bar:{}, ", -self.pips[O_BAR])?;
         }
         s.pop(); // remove last ", "
         s.pop();
-        write!(s, "}}").unwrap();
+        write!(s, "}}")?;
         write!(f, "{}", s)
     }
 }
