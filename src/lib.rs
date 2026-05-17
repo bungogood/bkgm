@@ -10,12 +10,14 @@ pub mod ubgi;
 pub mod utils;
 pub mod variants;
 
+pub use codecs::fibs::FibsError;
+pub use codecs::gnuid::GnuidError;
 pub use codecs::move_text::{
     apply as apply_move, encode as encode_move, encode_steps as encode_move_steps,
     format_move_steps, legal as legal_moves, legal_steps as legal_move_steps,
     normalize as normalize_move_text, parse_move_steps, MoveStep, MoveTextError, MoveTextResult,
 };
-pub use codecs::xgid::{Xgid, XgidBoard, XgidDice};
+pub use codecs::xgid::{Xgid, XgidBoard, XgidDice, XgidError};
 pub use dice::Dice;
 pub use engine_spec::{format_engine_spec, parse_engine_spec, EngineSpec, EngineSpecError};
 pub use game::{Game, GameError};

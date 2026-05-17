@@ -148,8 +148,7 @@ pub fn normalize(text: &str) -> Option<String> {
     let mut steps: Vec<String> = Vec::new();
     for token in text.split_whitespace() {
         let cleaned = token.replace(['*', ','], "");
-        let parts: Vec<&str> = cleaned.split('/').collect();
-        let points = parse_path_points(&parts)?;
+        let points = parse_path_points(cleaned.split('/'))?;
         for pair in points.windows(2) {
             steps.push(format!(
                 "{}/{}",
@@ -192,11 +191,25 @@ fn legal_for_steps<const N: u8>(
 ) -> MoveTextResult<Vec<(Vec<MoveStep>, VariantPosition)>> {
     let legal = legal_positions_with::<ClassicRules, N>(start, &dice);
     let legal_set: HashSet<Position<N>> = legal.iter().copied().collect();
-    let mut move_by_child: HashMap<Position<N>, Vec<MoveStep>> = HashMap::new();
+    let legal_index_by_child: HashMap<Position<N>, usize> = legal
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(idx, child)| (child, idx))
+        .collect();
+    let mut steps_by_legal_index: Vec<Option<Vec<MoveStep>>> = vec![None; legal.len()];
 
     for_each_die_order(dice, |order| {
         let mut steps = Vec::with_capacity(4);
-        collect_paths(start, order, 0, &mut steps, &legal_set, &mut move_by_child);
+        collect_paths(
+            start,
+            order,
+            0,
+            &mut steps,
+            &legal_set,
+            &legal_index_by_child,
+            &mut steps_by_legal_index,
+        );
         let mut steps_flipped = Vec::with_capacity(4);
         collect_paths(
             start.flip(),
@@ -204,14 +217,15 @@ fn legal_for_steps<const N: u8>(
             0,
             &mut steps_flipped,
             &legal_set,
-            &mut move_by_child,
+            &legal_index_by_child,
+            &mut steps_by_legal_index,
         );
         false
     });
 
     let mut out = Vec::with_capacity(legal.len());
-    for child in legal {
-        if let Some(steps) = move_by_child.get(&child) {
+    for (idx, child) in legal.into_iter().enumerate() {
+        if let Some(steps) = &steps_by_legal_index[idx] {
             out.push((steps.clone(), wrap(child)));
         }
     }
@@ -278,13 +292,13 @@ pub fn parse_move_steps(text: &str) -> Option<Vec<MoveStep>> {
     }
     let mut steps = Vec::new();
     for token in text.split_whitespace() {
-        let parts: Vec<&str> = token.split('/').collect();
-        if parts.len() != 2 {
+        let (from, to) = token.split_once('/')?;
+        if to.contains('/') {
             return None;
         }
         steps.push(MoveStep {
-            from: parse_from_point(parts[0])?,
-            to: parse_to_point(parts[1])?,
+            from: parse_from_point(from)?,
+            to: parse_to_point(to)?,
         });
     }
     Some(steps)
@@ -300,17 +314,26 @@ fn collect_paths<const N: u8>(
     die_idx: usize,
     steps: &mut Vec<MoveStep>,
     legal_set: &HashSet<Position<N>>,
-    move_by_child: &mut HashMap<Position<N>, Vec<MoveStep>>,
+    legal_index_by_child: &HashMap<Position<N>, usize>,
+    steps_by_legal_index: &mut [Option<Vec<MoveStep>>],
 ) {
     if die_idx == order.len() {
         let child = current.flip();
         if legal_set.contains(&child) {
-            move_by_child.entry(child).or_insert_with(|| steps.clone());
+            if let Some(idx) = legal_index_by_child.get(&child).copied() {
+                let slot = &mut steps_by_legal_index[idx];
+                if slot.is_none() {
+                    *slot = Some(steps.clone());
+                }
+            }
         }
         if legal_set.contains(&current) {
-            move_by_child
-                .entry(current)
-                .or_insert_with(|| steps.clone());
+            if let Some(idx) = legal_index_by_child.get(&current).copied() {
+                let slot = &mut steps_by_legal_index[idx];
+                if slot.is_none() {
+                    *slot = Some(steps.clone());
+                }
+            }
         }
         return;
     }
@@ -322,12 +345,28 @@ fn collect_paths<const N: u8>(
             found_any = true;
             let to = from.saturating_sub(die);
             steps.push(MoveStep { from, to });
-            collect_paths(next, order, die_idx + 1, steps, legal_set, move_by_child);
+            collect_paths(
+                next,
+                order,
+                die_idx + 1,
+                steps,
+                legal_set,
+                legal_index_by_child,
+                steps_by_legal_index,
+            );
             steps.pop();
         }
     }
     if !found_any {
-        collect_paths(current, order, die_idx + 1, steps, legal_set, move_by_child);
+        collect_paths(
+            current,
+            order,
+            die_idx + 1,
+            steps,
+            legal_set,
+            legal_index_by_child,
+            steps_by_legal_index,
+        );
     }
 }
 
@@ -378,18 +417,21 @@ fn parse_mid_point(raw: &str) -> Option<usize> {
     }
 }
 
-fn parse_path_points(parts: &[&str]) -> Option<Vec<usize>> {
-    if parts.len() < 2 {
-        return None;
-    }
-    let mut points = Vec::with_capacity(parts.len());
-    points.push(parse_from_point(parts[0])?);
-    for idx in 1..parts.len() {
-        if idx == parts.len() - 1 {
-            points.push(parse_to_point(parts[idx])?);
+fn parse_path_points<'a>(parts: impl Iterator<Item = &'a str>) -> Option<Vec<usize>> {
+    let mut parts = parts.peekable();
+    let first = parts.next()?;
+    let mut points = vec![parse_from_point(first)?];
+    let mut seen_any_more = false;
+    while let Some(part) = parts.next() {
+        seen_any_more = true;
+        if parts.peek().is_none() {
+            points.push(parse_to_point(part)?);
         } else {
-            points.push(parse_mid_point(parts[idx])?);
+            points.push(parse_mid_point(part)?);
         }
+    }
+    if !seen_any_more {
+        return None;
     }
     Some(points)
 }
@@ -427,6 +469,7 @@ mod tests {
     use super::{apply, encode, format_move_steps, legal, legal_steps, normalize};
     use crate::codecs::gnuid;
     use crate::dice::Dice;
+    use crate::position::Position;
     use crate::{Game, Variant};
 
     #[test]
@@ -498,5 +541,22 @@ mod tests {
         for (mv, child) in text_moves {
             assert!(rendered.iter().any(|(m, c)| m == &mv && c == &child));
         }
+    }
+
+    #[test]
+    fn apply_supports_hitting_move() {
+        let mut pips = [0i8; 26];
+        pips[8] = 1;
+        pips[5] = -1;
+        pips[4] = -2;
+        let position = Position::<15>::try_from(pips).expect("valid custom board");
+        let variant_position = crate::VariantPosition::Backgammon(position);
+        let dice = Dice::new(3, 1);
+
+        let next = apply(variant_position, dice, "8/5").expect("hitting move applies");
+        let legal = legal(variant_position, dice).expect("legal moves");
+        assert!(legal
+            .iter()
+            .any(|(mv, child)| mv == "8/5" && *child == next));
     }
 }

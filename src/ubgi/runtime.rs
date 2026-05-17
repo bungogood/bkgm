@@ -178,7 +178,7 @@ fn handle_command(
         Command::Get(key) => handle_get(engine, state, &key),
         Command::Set { key, value } => handle_set(engine, state, &key, &value),
         Command::PositionGnubgid(id) => {
-            if let Some(pos) = gnuid::decode(state.variant, id.trim()) {
+            if let Ok(pos) = gnuid::decode(state.variant, id.trim()) {
                 let _ = state.game.set_position(pos);
                 Vec::new()
             } else {

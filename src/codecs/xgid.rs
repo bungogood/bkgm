@@ -1,6 +1,20 @@
 use crate::position::{Position, State};
 use crate::{Variant, VariantPosition};
 
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum XgidError {
+    #[error("invalid XGID payload")]
+    InvalidPayload,
+    #[error("invalid XGID board")]
+    InvalidBoard,
+    #[error("invalid XGID dice")]
+    InvalidDice,
+    #[error("invalid XGID move flag")]
+    InvalidMoveFlag,
+    #[error("invalid XGID cube owner")]
+    InvalidCubeOwner,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Xgid {
     pub board: XgidBoard,
@@ -25,7 +39,7 @@ pub enum XgidDice {
 }
 
 impl Xgid {
-    pub fn parse(input: &str) -> Option<Self> {
+    pub fn parse(input: &str) -> Result<Self, XgidError> {
         parse(input)
     }
 
@@ -35,7 +49,7 @@ impl Xgid {
 }
 
 impl XgidBoard {
-    pub fn parse(input: &str) -> Option<Self> {
+    pub fn parse(input: &str) -> Result<Self, XgidError> {
         parse_board(input)
     }
 
@@ -64,7 +78,7 @@ pub fn encode_board(position: VariantPosition) -> String {
     }
 }
 
-pub fn decode_board(variant: Variant, board: &str) -> Option<VariantPosition> {
+pub fn decode_board(variant: Variant, board: &str) -> Result<VariantPosition, XgidError> {
     match variant {
         Variant::Backgammon => {
             decode_board_for_position::<15>(board).map(VariantPosition::Backgammon)
@@ -90,32 +104,60 @@ pub fn decode_board(variant: Variant, board: &str) -> Option<VariantPosition> {
     }
 }
 
-pub fn parse(input: &str) -> Option<Xgid> {
+pub fn parse(input: &str) -> Result<Xgid, XgidError> {
     let raw = input.trim();
     let payload = raw.strip_prefix("XGID=").unwrap_or(raw);
     let mut parts = payload.split(':');
-    let board = parse_board(parts.next()?)?;
-    let max_cube = parts.next()?.parse().ok()?;
-    let match_length = parts.next()?.parse().ok()?;
-    let rules = parts.next()?.parse().ok()?;
-    let score_x = parts.next()?.parse().ok()?;
-    let score_o = parts.next()?.parse().ok()?;
-    let dice = parse_dice(parts.next()?)?;
-    let move_flag = match parts.next()? {
+    let board = parse_board(parts.next().ok_or(XgidError::InvalidPayload)?)?;
+    let max_cube = parts
+        .next()
+        .ok_or(XgidError::InvalidPayload)?
+        .parse()
+        .map_err(|_| XgidError::InvalidPayload)?;
+    let match_length = parts
+        .next()
+        .ok_or(XgidError::InvalidPayload)?
+        .parse()
+        .map_err(|_| XgidError::InvalidPayload)?;
+    let rules = parts
+        .next()
+        .ok_or(XgidError::InvalidPayload)?
+        .parse()
+        .map_err(|_| XgidError::InvalidPayload)?;
+    let score_x = parts
+        .next()
+        .ok_or(XgidError::InvalidPayload)?
+        .parse()
+        .map_err(|_| XgidError::InvalidPayload)?;
+    let score_o = parts
+        .next()
+        .ok_or(XgidError::InvalidPayload)?
+        .parse()
+        .map_err(|_| XgidError::InvalidPayload)?;
+    let dice = parse_dice(parts.next().ok_or(XgidError::InvalidPayload)?)?;
+    let move_flag = match parts.next().ok_or(XgidError::InvalidPayload)? {
         "0" => false,
         "1" => true,
-        _ => return None,
+        _ => return Err(XgidError::InvalidMoveFlag),
     };
-    let cube_owner: i8 = parts.next()?.parse().ok()?;
+    let cube_owner: i8 = parts
+        .next()
+        .ok_or(XgidError::InvalidPayload)?
+        .parse()
+        .map_err(|_| XgidError::InvalidCubeOwner)?;
     if !(-1..=1).contains(&cube_owner) {
-        return None;
+        return Err(XgidError::InvalidCubeOwner);
     }
-    let cube_power = parts.next()?.parse().ok()?;
+    let cube_power = parts
+        .next()
+        .ok_or(XgidError::InvalidPayload)?
+        .parse()
+        .map_err(|_| XgidError::InvalidPayload)?;
     if parts.next().is_some() {
-        return None;
+        return Err(XgidError::InvalidPayload);
     }
 
-    Some(Xgid {
+    Ok(Xgid {
         board,
         max_cube,
         match_length,
@@ -149,10 +191,10 @@ pub fn format(xgid: Xgid) -> String {
     )
 }
 
-pub fn parse_board(input: &str) -> Option<XgidBoard> {
+pub fn parse_board(input: &str) -> Result<XgidBoard, XgidError> {
     let bytes = input.as_bytes();
     if bytes.len() != 26 {
-        return None;
+        return Err(XgidError::InvalidBoard);
     }
     let mut out = [b'-'; 26];
     for (idx, byte) in bytes.iter().enumerate() {
@@ -160,10 +202,10 @@ pub fn parse_board(input: &str) -> Option<XgidBoard> {
             b'-' => out[idx] = b'-',
             b'a'..=b'p' => out[idx] = *byte,
             b'A'..=b'P' => out[idx] = *byte,
-            _ => return None,
+            _ => return Err(XgidError::InvalidBoard),
         }
     }
-    Some(XgidBoard::from_bytes(out))
+    Ok(XgidBoard::from_bytes(out))
 }
 
 pub fn format_board(board: XgidBoard) -> String {
@@ -202,7 +244,7 @@ pub fn encode_board_for_position<const N: u8>(position: Position<N>) -> String {
         .to_owned()
 }
 
-pub fn decode_board_for_position<const N: u8>(board: &str) -> Option<Position<N>> {
+pub fn decode_board_for_position<const N: u8>(board: &str) -> Result<Position<N>, XgidError> {
     let board = parse_board(board)?;
     let mut pips = [0i8; 26];
 
@@ -212,7 +254,7 @@ pub fn decode_board_for_position<const N: u8>(board: &str) -> Option<Position<N>
                 continue;
             }
             if !(b'a'..=b'p').contains(&ch) {
-                return None;
+                return Err(XgidError::InvalidBoard);
             }
             pips[25] = (ch - b'a' + 1) as i8;
             continue;
@@ -222,7 +264,7 @@ pub fn decode_board_for_position<const N: u8>(board: &str) -> Option<Position<N>
                 continue;
             }
             if !(b'A'..=b'P').contains(&ch) {
-                return None;
+                return Err(XgidError::InvalidBoard);
             }
             pips[0] = -((ch - b'A' + 1) as i8);
             continue;
@@ -233,33 +275,38 @@ pub fn decode_board_for_position<const N: u8>(board: &str) -> Option<Position<N>
             b'-' => 0,
             b'a'..=b'p' => (ch - b'a' + 1) as i8,
             b'A'..=b'P' => -((ch - b'A' + 1) as i8),
-            _ => return None,
+            _ => return Err(XgidError::InvalidBoard),
         };
     }
 
-    Position::try_from(pips).ok()
+    Position::try_from(pips).map_err(|_| XgidError::InvalidBoard)
 }
 
-fn parse_dice(raw: &str) -> Option<XgidDice> {
+fn parse_dice(raw: &str) -> Result<XgidDice, XgidError> {
     if raw == "D" {
-        return Some(XgidDice::DoubleOffered);
+        return Ok(XgidDice::DoubleOffered);
     }
     let bytes = raw.as_bytes();
     if bytes.len() != 2 {
-        return None;
+        return Err(XgidError::InvalidDice);
     }
-    let d1 = (bytes[0] as char).to_digit(10)? as u8;
-    let d2 = (bytes[1] as char).to_digit(10)? as u8;
+    let d1 = (bytes[0] as char)
+        .to_digit(10)
+        .ok_or(XgidError::InvalidDice)? as u8;
+    let d2 = (bytes[1] as char)
+        .to_digit(10)
+        .ok_or(XgidError::InvalidDice)? as u8;
     if d1 > 6 || d2 > 6 {
-        return None;
+        return Err(XgidError::InvalidDice);
     }
-    Some(XgidDice::Rolled(d1, d2))
+    Ok(XgidDice::Rolled(d1, d2))
 }
 
 #[cfg(test)]
 mod tests {
     use super::{decode_board, encode_board, format, parse, Xgid, XgidDice};
     use crate::codecs::gnuid;
+    use crate::position::Position;
     use crate::{Game, Variant};
 
     #[test]
@@ -289,5 +336,22 @@ mod tests {
         let encoded = format(full);
         let decoded = parse(&encoded).expect("must parse xgid");
         assert_eq!(decoded, full);
+    }
+
+    #[test]
+    fn xgid_board_roundtrip_with_bars_and_off() {
+        let mut pips = [0i8; 26];
+        pips[25] = 2;
+        pips[0] = -1;
+        pips[8] = 3;
+        pips[6] = 2;
+        pips[19] = -2;
+        pips[17] = -1;
+        let position = Position::<15>::try_from(pips).expect("valid custom board");
+        let variant_position = crate::VariantPosition::Backgammon(position);
+
+        let board = encode_board(variant_position);
+        let parsed = decode_board(Variant::Backgammon, &board).expect("must decode board");
+        assert_eq!(gnuid::encode(parsed), gnuid::encode(variant_position));
     }
 }

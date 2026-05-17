@@ -4,6 +4,14 @@ use base64::Engine;
 use crate::position::{Position, O_BAR, X_BAR};
 use crate::{State, Variant, VariantPosition};
 
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum GnuidError {
+    #[error("invalid GNUID base64 payload")]
+    InvalidBase64,
+    #[error("invalid GNUID key length")]
+    InvalidKeyLength,
+}
+
 pub fn encode(position: VariantPosition) -> String {
     match position {
         VariantPosition::Backgammon(p) => encode_position(&p),
@@ -16,7 +24,7 @@ pub fn encode(position: VariantPosition) -> String {
     }
 }
 
-pub fn decode(variant: Variant, id: &str) -> Option<VariantPosition> {
+pub fn decode(variant: Variant, id: &str) -> Result<VariantPosition, GnuidError> {
     match variant {
         Variant::Backgammon => decode_position::<15>(id).map(VariantPosition::Backgammon),
         Variant::Nackgammon => decode_position::<15>(id).map(VariantPosition::Nackgammon),
@@ -34,11 +42,13 @@ pub fn encode_position<const N: u8>(position: &Position<N>) -> String {
     b64[..14].to_string()
 }
 
-pub fn decode_position<const N: u8>(id: &str) -> Option<Position<N>> {
+pub fn decode_position<const N: u8>(id: &str) -> Result<Position<N>, GnuidError> {
     let padded_id = format!("{}==", id);
-    let key = general_purpose::STANDARD.decode(padded_id).ok()?;
-    let key: [u8; 10] = key.try_into().ok()?;
-    Some(decode_key(key))
+    let key = general_purpose::STANDARD
+        .decode(padded_id)
+        .map_err(|_| GnuidError::InvalidBase64)?;
+    let key: [u8; 10] = key.try_into().map_err(|_| GnuidError::InvalidKeyLength)?;
+    Ok(decode_key(key))
 }
 
 pub fn encode_key<const N: u8>(position: &Position<N>) -> [u8; 10] {
@@ -120,6 +130,7 @@ pub fn decode_key<const N: u8>(key: [u8; 10]) -> Position<N> {
 #[cfg(test)]
 mod tests {
     use super::{decode, encode};
+    use crate::position::Position;
     use crate::Variant;
 
     #[test]
@@ -135,5 +146,22 @@ mod tests {
             let encoded = encode(pos);
             assert_eq!(encoded, id);
         }
+    }
+
+    #[test]
+    fn gnuid_roundtrip_with_bars_and_off() {
+        let mut pips = [0i8; 26];
+        pips[25] = 2;
+        pips[0] = -1;
+        pips[8] = 3;
+        pips[6] = 2;
+        pips[19] = -2;
+        pips[17] = -1;
+        let position = Position::<15>::try_from(pips).expect("valid custom board");
+        let variant_position = crate::VariantPosition::Backgammon(position);
+
+        let id = encode(variant_position);
+        let decoded = decode(Variant::Backgammon, &id).expect("must decode gnuid");
+        assert_eq!(encode(decoded), id);
     }
 }
