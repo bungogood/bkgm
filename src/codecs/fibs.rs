@@ -1,62 +1,57 @@
+use crate::codecs::VariantCodec;
 use crate::dice::Dice;
 use crate::position::Position;
 use crate::{State, Variant, VariantPosition};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum FibsError {
-    #[error("invalid FIBS board payload")]
+    #[error("invalid FIBS payload")]
     InvalidPayload,
-    #[error("invalid FIBS turn '{0}'")]
-    InvalidTurn(String),
-    #[error("invalid FIBS bar/off counts")]
-    InvalidCounts,
-    #[error("invalid FIBS point token '{0}'")]
-    InvalidPointToken(String),
+    #[error("invalid FIBS field '{0}'")]
+    InvalidField(&'static str),
     #[error("invalid FIBS position")]
     InvalidPosition,
-    #[error("FIBS off counts do not match derived position")]
-    OffCountMismatch,
 }
 
-pub fn encode_board(position: VariantPosition) -> String {
+pub struct FibsCodec;
+
+impl VariantCodec for FibsCodec {
+    type Error = FibsError;
+
+    fn encode(position: VariantPosition) -> String {
+        encode(position)
+    }
+
+    fn decode(variant: Variant, input: &str) -> Result<VariantPosition, Self::Error> {
+        decode(variant, input)
+    }
+}
+
+pub fn encode(position: VariantPosition) -> String {
     match position {
-        VariantPosition::Backgammon(p) => encode_board_for_position(p),
-        VariantPosition::Nackgammon(p) => encode_board_for_position(p),
-        VariantPosition::Longgammon(p) => encode_board_for_position(p),
-        VariantPosition::Hypergammon(p) => encode_board_for_position(p),
-        VariantPosition::Hypergammon2(p) => encode_board_for_position(p),
-        VariantPosition::Hypergammon4(p) => encode_board_for_position(p),
-        VariantPosition::Hypergammon5(p) => encode_board_for_position(p),
+        VariantPosition::Backgammon(p) => encode_for_position(p),
+        VariantPosition::Nackgammon(p) => encode_for_position(p),
+        VariantPosition::Longgammon(p) => encode_for_position(p),
+        VariantPosition::Hypergammon(p) => encode_for_position(p),
+        VariantPosition::Hypergammon2(p) => encode_for_position(p),
+        VariantPosition::Hypergammon4(p) => encode_for_position(p),
+        VariantPosition::Hypergammon5(p) => encode_for_position(p),
     }
 }
 
-pub fn decode_board(variant: Variant, text: &str) -> Result<VariantPosition, FibsError> {
+pub fn decode(variant: Variant, text: &str) -> Result<VariantPosition, FibsError> {
     match variant {
-        Variant::Backgammon => {
-            decode_board_for_position::<15>(text).map(VariantPosition::Backgammon)
-        }
-        Variant::Nackgammon => {
-            decode_board_for_position::<15>(text).map(VariantPosition::Nackgammon)
-        }
-        Variant::Longgammon => {
-            decode_board_for_position::<15>(text).map(VariantPosition::Longgammon)
-        }
-        Variant::Hypergammon => {
-            decode_board_for_position::<3>(text).map(VariantPosition::Hypergammon)
-        }
-        Variant::Hypergammon2 => {
-            decode_board_for_position::<2>(text).map(VariantPosition::Hypergammon2)
-        }
-        Variant::Hypergammon4 => {
-            decode_board_for_position::<4>(text).map(VariantPosition::Hypergammon4)
-        }
-        Variant::Hypergammon5 => {
-            decode_board_for_position::<5>(text).map(VariantPosition::Hypergammon5)
-        }
+        Variant::Backgammon => decode_for_position::<15>(text).map(VariantPosition::Backgammon),
+        Variant::Nackgammon => decode_for_position::<15>(text).map(VariantPosition::Nackgammon),
+        Variant::Longgammon => decode_for_position::<15>(text).map(VariantPosition::Longgammon),
+        Variant::Hypergammon => decode_for_position::<3>(text).map(VariantPosition::Hypergammon),
+        Variant::Hypergammon2 => decode_for_position::<2>(text).map(VariantPosition::Hypergammon2),
+        Variant::Hypergammon4 => decode_for_position::<4>(text).map(VariantPosition::Hypergammon4),
+        Variant::Hypergammon5 => decode_for_position::<5>(text).map(VariantPosition::Hypergammon5),
     }
 }
 
-pub fn encode_board_for_position<const N: u8>(position: Position<N>) -> String {
+fn encode_for_position<const N: u8>(position: Position<N>) -> String {
     let turn = if position.turn() { "x" } else { "o" };
     let bar = format!("x{},o{}", position.x_bar(), position.o_bar());
     let off = format!("x{},o{}", position.x_off(), position.o_off());
@@ -77,7 +72,7 @@ pub fn encode_board_for_position<const N: u8>(position: Position<N>) -> String {
     format!("turn={turn};bar={bar};off={off};points={points}")
 }
 
-pub fn decode_board_for_position<const N: u8>(text: &str) -> Result<Position<N>, FibsError> {
+fn decode_for_position<const N: u8>(text: &str) -> Result<Position<N>, FibsError> {
     let mut turn = None;
     let mut bar = None;
     let mut off = None;
@@ -120,10 +115,10 @@ pub fn decode_board_for_position<const N: u8>(text: &str) -> Result<Position<N>,
     if turn == "o" {
         position = position.flip();
     } else if turn != "x" {
-        return Err(FibsError::InvalidTurn(turn));
+        return Err(FibsError::InvalidField("turn"));
     }
     if position.x_off() != x_off_expected || position.o_off() != o_off_expected {
-        return Err(FibsError::OffCountMismatch);
+        return Err(FibsError::InvalidPosition);
     }
     Ok(position)
 }
@@ -157,16 +152,22 @@ fn parse_two_counts(raw: &str) -> Result<(u8, u8), FibsError> {
     for chunk in raw.split(',') {
         let chunk = chunk.trim();
         if let Some(rest) = chunk.strip_prefix('x') {
-            x = Some(rest.parse::<u8>().map_err(|_| FibsError::InvalidCounts)?);
+            x = Some(
+                rest.parse::<u8>()
+                    .map_err(|_| FibsError::InvalidField("count"))?,
+            );
         } else if let Some(rest) = chunk.strip_prefix('o') {
-            o = Some(rest.parse::<u8>().map_err(|_| FibsError::InvalidCounts)?);
+            o = Some(
+                rest.parse::<u8>()
+                    .map_err(|_| FibsError::InvalidField("count"))?,
+            );
         } else {
-            return Err(FibsError::InvalidCounts);
+            return Err(FibsError::InvalidField("count"));
         }
     }
     Ok((
-        x.ok_or(FibsError::InvalidCounts)?,
-        o.ok_or(FibsError::InvalidCounts)?,
+        x.ok_or(FibsError::InvalidField("count"))?,
+        o.ok_or(FibsError::InvalidField("count"))?,
     ))
 }
 
@@ -177,20 +178,21 @@ fn parse_point_token(token: &str) -> Result<i8, FibsError> {
     if let Some(rest) = token.strip_prefix('x') {
         return rest
             .parse::<i8>()
-            .map_err(|_| FibsError::InvalidPointToken(token.to_string()));
+            .map_err(|_| FibsError::InvalidField("points"));
     }
     if let Some(rest) = token.strip_prefix('o') {
         return rest
             .parse::<i8>()
             .map(|n| -n)
-            .map_err(|_| FibsError::InvalidPointToken(token.to_string()));
+            .map_err(|_| FibsError::InvalidField("points"));
     }
-    Err(FibsError::InvalidPointToken(token.to_string()))
+    Err(FibsError::InvalidField("points"))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_board, encode_board};
+    use super::{decode, encode, FibsCodec};
+    use crate::codecs::assert_roundtrip;
     use crate::codecs::gnuid;
     use crate::position::Position;
     use crate::{Game, Variant};
@@ -198,9 +200,10 @@ mod tests {
     #[test]
     fn fibs_board_roundtrip_start_position() {
         let game = Game::new(Variant::Backgammon);
-        let encoded = encode_board(game.position());
-        let decoded = decode_board(Variant::Backgammon, &encoded).unwrap();
+        let encoded = encode(game.position());
+        let decoded = decode(Variant::Backgammon, &encoded).unwrap();
         assert_eq!(gnuid::encode(decoded), gnuid::encode(game.position()));
+        assert_roundtrip::<FibsCodec>(Variant::Backgammon, game.position());
     }
 
     #[test]
@@ -215,8 +218,8 @@ mod tests {
         let position = Position::<15>::try_from(pips).expect("valid custom board");
         let variant_position = crate::VariantPosition::Backgammon(position);
 
-        let encoded = encode_board(variant_position);
-        let decoded = decode_board(Variant::Backgammon, &encoded).expect("must decode board");
+        let encoded = encode(variant_position);
+        let decoded = decode(Variant::Backgammon, &encoded).expect("must decode board");
         assert_eq!(gnuid::encode(decoded), gnuid::encode(variant_position));
     }
 }

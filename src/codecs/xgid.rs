@@ -1,3 +1,4 @@
+use crate::codecs::VariantCodec;
 use crate::position::{Position, State};
 use crate::{Variant, VariantPosition};
 
@@ -5,14 +6,24 @@ use crate::{Variant, VariantPosition};
 pub enum XgidError {
     #[error("invalid XGID payload")]
     InvalidPayload,
-    #[error("invalid XGID board")]
-    InvalidBoard,
-    #[error("invalid XGID dice")]
-    InvalidDice,
-    #[error("invalid XGID move flag")]
-    InvalidMoveFlag,
-    #[error("invalid XGID cube owner")]
-    InvalidCubeOwner,
+    #[error("invalid XGID field '{0}'")]
+    InvalidField(&'static str),
+    #[error("invalid XGID position")]
+    InvalidPosition,
+}
+
+pub struct XgidCodec;
+
+impl VariantCodec for XgidCodec {
+    type Error = XgidError;
+
+    fn encode(position: VariantPosition) -> String {
+        encode(position)
+    }
+
+    fn decode(variant: Variant, input: &str) -> Result<VariantPosition, Self::Error> {
+        decode(variant, input)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,11 +51,11 @@ pub enum XgidDice {
 
 impl Xgid {
     pub fn parse(input: &str) -> Result<Self, XgidError> {
-        parse(input)
+        parse_xgid(input)
     }
 
     pub fn format(self) -> String {
-        format(self)
+        format_xgid(self)
     }
 }
 
@@ -66,45 +77,31 @@ impl XgidBoard {
     }
 }
 
-pub fn encode_board(position: VariantPosition) -> String {
+pub fn encode(position: VariantPosition) -> String {
     match position {
-        VariantPosition::Backgammon(p) => encode_board_for_position(p),
-        VariantPosition::Nackgammon(p) => encode_board_for_position(p),
-        VariantPosition::Longgammon(p) => encode_board_for_position(p),
-        VariantPosition::Hypergammon(p) => encode_board_for_position(p),
-        VariantPosition::Hypergammon2(p) => encode_board_for_position(p),
-        VariantPosition::Hypergammon4(p) => encode_board_for_position(p),
-        VariantPosition::Hypergammon5(p) => encode_board_for_position(p),
+        VariantPosition::Backgammon(p) => encode_for_position(p),
+        VariantPosition::Nackgammon(p) => encode_for_position(p),
+        VariantPosition::Longgammon(p) => encode_for_position(p),
+        VariantPosition::Hypergammon(p) => encode_for_position(p),
+        VariantPosition::Hypergammon2(p) => encode_for_position(p),
+        VariantPosition::Hypergammon4(p) => encode_for_position(p),
+        VariantPosition::Hypergammon5(p) => encode_for_position(p),
     }
 }
 
-pub fn decode_board(variant: Variant, board: &str) -> Result<VariantPosition, XgidError> {
+pub fn decode(variant: Variant, board: &str) -> Result<VariantPosition, XgidError> {
     match variant {
-        Variant::Backgammon => {
-            decode_board_for_position::<15>(board).map(VariantPosition::Backgammon)
-        }
-        Variant::Nackgammon => {
-            decode_board_for_position::<15>(board).map(VariantPosition::Nackgammon)
-        }
-        Variant::Longgammon => {
-            decode_board_for_position::<15>(board).map(VariantPosition::Longgammon)
-        }
-        Variant::Hypergammon => {
-            decode_board_for_position::<3>(board).map(VariantPosition::Hypergammon)
-        }
-        Variant::Hypergammon2 => {
-            decode_board_for_position::<2>(board).map(VariantPosition::Hypergammon2)
-        }
-        Variant::Hypergammon4 => {
-            decode_board_for_position::<4>(board).map(VariantPosition::Hypergammon4)
-        }
-        Variant::Hypergammon5 => {
-            decode_board_for_position::<5>(board).map(VariantPosition::Hypergammon5)
-        }
+        Variant::Backgammon => decode_for_position::<15>(board).map(VariantPosition::Backgammon),
+        Variant::Nackgammon => decode_for_position::<15>(board).map(VariantPosition::Nackgammon),
+        Variant::Longgammon => decode_for_position::<15>(board).map(VariantPosition::Longgammon),
+        Variant::Hypergammon => decode_for_position::<3>(board).map(VariantPosition::Hypergammon),
+        Variant::Hypergammon2 => decode_for_position::<2>(board).map(VariantPosition::Hypergammon2),
+        Variant::Hypergammon4 => decode_for_position::<4>(board).map(VariantPosition::Hypergammon4),
+        Variant::Hypergammon5 => decode_for_position::<5>(board).map(VariantPosition::Hypergammon5),
     }
 }
 
-pub fn parse(input: &str) -> Result<Xgid, XgidError> {
+pub fn parse_xgid(input: &str) -> Result<Xgid, XgidError> {
     let raw = input.trim();
     let payload = raw.strip_prefix("XGID=").unwrap_or(raw);
     let mut parts = payload.split(':');
@@ -138,15 +135,15 @@ pub fn parse(input: &str) -> Result<Xgid, XgidError> {
     let move_flag = match parts.next().ok_or(XgidError::InvalidPayload)? {
         "0" => false,
         "1" => true,
-        _ => return Err(XgidError::InvalidMoveFlag),
+        _ => return Err(XgidError::InvalidField("move_flag")),
     };
     let cube_owner: i8 = parts
         .next()
         .ok_or(XgidError::InvalidPayload)?
         .parse()
-        .map_err(|_| XgidError::InvalidCubeOwner)?;
+        .map_err(|_| XgidError::InvalidField("cube_owner"))?;
     if !(-1..=1).contains(&cube_owner) {
-        return Err(XgidError::InvalidCubeOwner);
+        return Err(XgidError::InvalidField("cube_owner"));
     }
     let cube_power = parts
         .next()
@@ -171,7 +168,7 @@ pub fn parse(input: &str) -> Result<Xgid, XgidError> {
     })
 }
 
-pub fn format(xgid: Xgid) -> String {
+pub fn format_xgid(xgid: Xgid) -> String {
     let dice = match xgid.dice {
         XgidDice::Rolled(d1, d2) => format!("{}{}", d1, d2),
         XgidDice::DoubleOffered => "D".to_string(),
@@ -191,10 +188,10 @@ pub fn format(xgid: Xgid) -> String {
     )
 }
 
-pub fn parse_board(input: &str) -> Result<XgidBoard, XgidError> {
+fn parse_board(input: &str) -> Result<XgidBoard, XgidError> {
     let bytes = input.as_bytes();
     if bytes.len() != 26 {
-        return Err(XgidError::InvalidBoard);
+        return Err(XgidError::InvalidField("board"));
     }
     let mut out = [b'-'; 26];
     for (idx, byte) in bytes.iter().enumerate() {
@@ -202,19 +199,19 @@ pub fn parse_board(input: &str) -> Result<XgidBoard, XgidError> {
             b'-' => out[idx] = b'-',
             b'a'..=b'p' => out[idx] = *byte,
             b'A'..=b'P' => out[idx] = *byte,
-            _ => return Err(XgidError::InvalidBoard),
+            _ => return Err(XgidError::InvalidField("board")),
         }
     }
     Ok(XgidBoard::from_bytes(out))
 }
 
-pub fn format_board(board: XgidBoard) -> String {
+fn format_board(board: XgidBoard) -> String {
     std::str::from_utf8(&board.bytes())
         .expect("board bytes must be ascii")
         .to_owned()
 }
 
-pub fn encode_board_for_position<const N: u8>(position: Position<N>) -> String {
+fn encode_for_position<const N: u8>(position: Position<N>) -> String {
     let mut chars = [b'-'; 26];
 
     let x_bar = position.x_bar();
@@ -244,7 +241,7 @@ pub fn encode_board_for_position<const N: u8>(position: Position<N>) -> String {
         .to_owned()
 }
 
-pub fn decode_board_for_position<const N: u8>(board: &str) -> Result<Position<N>, XgidError> {
+fn decode_for_position<const N: u8>(board: &str) -> Result<Position<N>, XgidError> {
     let board = parse_board(board)?;
     let mut pips = [0i8; 26];
 
@@ -254,7 +251,7 @@ pub fn decode_board_for_position<const N: u8>(board: &str) -> Result<Position<N>
                 continue;
             }
             if !(b'a'..=b'p').contains(&ch) {
-                return Err(XgidError::InvalidBoard);
+                return Err(XgidError::InvalidField("board"));
             }
             pips[25] = (ch - b'a' + 1) as i8;
             continue;
@@ -264,7 +261,7 @@ pub fn decode_board_for_position<const N: u8>(board: &str) -> Result<Position<N>
                 continue;
             }
             if !(b'A'..=b'P').contains(&ch) {
-                return Err(XgidError::InvalidBoard);
+                return Err(XgidError::InvalidField("board"));
             }
             pips[0] = -((ch - b'A' + 1) as i8);
             continue;
@@ -275,11 +272,11 @@ pub fn decode_board_for_position<const N: u8>(board: &str) -> Result<Position<N>
             b'-' => 0,
             b'a'..=b'p' => (ch - b'a' + 1) as i8,
             b'A'..=b'P' => -((ch - b'A' + 1) as i8),
-            _ => return Err(XgidError::InvalidBoard),
+            _ => return Err(XgidError::InvalidField("board")),
         };
     }
 
-    Position::try_from(pips).map_err(|_| XgidError::InvalidBoard)
+    Position::try_from(pips).map_err(|_| XgidError::InvalidPosition)
 }
 
 fn parse_dice(raw: &str) -> Result<XgidDice, XgidError> {
@@ -288,23 +285,24 @@ fn parse_dice(raw: &str) -> Result<XgidDice, XgidError> {
     }
     let bytes = raw.as_bytes();
     if bytes.len() != 2 {
-        return Err(XgidError::InvalidDice);
+        return Err(XgidError::InvalidField("dice"));
     }
     let d1 = (bytes[0] as char)
         .to_digit(10)
-        .ok_or(XgidError::InvalidDice)? as u8;
+        .ok_or(XgidError::InvalidField("dice"))? as u8;
     let d2 = (bytes[1] as char)
         .to_digit(10)
-        .ok_or(XgidError::InvalidDice)? as u8;
+        .ok_or(XgidError::InvalidField("dice"))? as u8;
     if d1 > 6 || d2 > 6 {
-        return Err(XgidError::InvalidDice);
+        return Err(XgidError::InvalidField("dice"));
     }
     Ok(XgidDice::Rolled(d1, d2))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_board, encode_board, format, parse, Xgid, XgidDice};
+    use super::{decode, encode, format_xgid, parse_xgid, Xgid, XgidCodec, XgidDice};
+    use crate::codecs::assert_roundtrip;
     use crate::codecs::gnuid;
     use crate::position::Position;
     use crate::{Game, Variant};
@@ -312,15 +310,16 @@ mod tests {
     #[test]
     fn xgid_board_roundtrip() {
         let game = Game::new(Variant::Backgammon);
-        let board = encode_board(game.position());
-        let parsed = decode_board(Variant::Backgammon, &board).expect("must decode board");
+        let board = encode(game.position());
+        let parsed = decode(Variant::Backgammon, &board).expect("must decode board");
         assert_eq!(gnuid::encode(parsed), gnuid::encode(game.position()));
+        assert_roundtrip::<XgidCodec>(Variant::Backgammon, game.position());
     }
 
     #[test]
     fn xgid_full_roundtrip() {
         let game = Game::new(Variant::Backgammon);
-        let board = encode_board(game.position());
+        let board = encode(game.position());
         let full = Xgid {
             board: super::XgidBoard::parse(&board).expect("valid board"),
             max_cube: 0,
@@ -333,8 +332,8 @@ mod tests {
             cube_owner: 0,
             cube_power: 0,
         };
-        let encoded = format(full);
-        let decoded = parse(&encoded).expect("must parse xgid");
+        let encoded = format_xgid(full);
+        let decoded = parse_xgid(&encoded).expect("must parse xgid");
         assert_eq!(decoded, full);
     }
 
@@ -350,8 +349,8 @@ mod tests {
         let position = Position::<15>::try_from(pips).expect("valid custom board");
         let variant_position = crate::VariantPosition::Backgammon(position);
 
-        let board = encode_board(variant_position);
-        let parsed = decode_board(Variant::Backgammon, &board).expect("must decode board");
+        let board = encode(variant_position);
+        let parsed = decode(Variant::Backgammon, &board).expect("must decode board");
         assert_eq!(gnuid::encode(parsed), gnuid::encode(variant_position));
     }
 }

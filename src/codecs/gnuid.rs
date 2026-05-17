@@ -1,57 +1,82 @@
 use base64::engine::general_purpose;
 use base64::Engine;
 
+use crate::codecs::VariantCodec;
 use crate::position::{Position, O_BAR, X_BAR};
 use crate::{State, Variant, VariantPosition};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum GnuidError {
-    #[error("invalid GNUID base64 payload")]
-    InvalidBase64,
-    #[error("invalid GNUID key length")]
-    InvalidKeyLength,
+    #[error("invalid GNUID payload")]
+    InvalidPayload,
+    #[error("invalid GNUID field '{0}'")]
+    InvalidField(&'static str),
+}
+
+pub struct GnuidCodec;
+
+impl VariantCodec for GnuidCodec {
+    type Error = GnuidError;
+
+    fn encode(position: VariantPosition) -> String {
+        encode(position)
+    }
+
+    fn decode(variant: Variant, input: &str) -> Result<VariantPosition, Self::Error> {
+        decode(variant, input)
+    }
 }
 
 pub fn encode(position: VariantPosition) -> String {
     match position {
-        VariantPosition::Backgammon(p) => encode_position(&p),
-        VariantPosition::Nackgammon(p) => encode_position(&p),
-        VariantPosition::Longgammon(p) => encode_position(&p),
-        VariantPosition::Hypergammon(p) => encode_position(&p),
-        VariantPosition::Hypergammon2(p) => encode_position(&p),
-        VariantPosition::Hypergammon4(p) => encode_position(&p),
-        VariantPosition::Hypergammon5(p) => encode_position(&p),
+        VariantPosition::Backgammon(p) => encode_for_position(&p),
+        VariantPosition::Nackgammon(p) => encode_for_position(&p),
+        VariantPosition::Longgammon(p) => encode_for_position(&p),
+        VariantPosition::Hypergammon(p) => encode_for_position(&p),
+        VariantPosition::Hypergammon2(p) => encode_for_position(&p),
+        VariantPosition::Hypergammon4(p) => encode_for_position(&p),
+        VariantPosition::Hypergammon5(p) => encode_for_position(&p),
     }
 }
 
 pub fn decode(variant: Variant, id: &str) -> Result<VariantPosition, GnuidError> {
     match variant {
-        Variant::Backgammon => decode_position::<15>(id).map(VariantPosition::Backgammon),
-        Variant::Nackgammon => decode_position::<15>(id).map(VariantPosition::Nackgammon),
-        Variant::Longgammon => decode_position::<15>(id).map(VariantPosition::Longgammon),
-        Variant::Hypergammon => decode_position::<3>(id).map(VariantPosition::Hypergammon),
-        Variant::Hypergammon2 => decode_position::<2>(id).map(VariantPosition::Hypergammon2),
-        Variant::Hypergammon4 => decode_position::<4>(id).map(VariantPosition::Hypergammon4),
-        Variant::Hypergammon5 => decode_position::<5>(id).map(VariantPosition::Hypergammon5),
+        Variant::Backgammon => decode_for_position::<15>(id).map(VariantPosition::Backgammon),
+        Variant::Nackgammon => decode_for_position::<15>(id).map(VariantPosition::Nackgammon),
+        Variant::Longgammon => decode_for_position::<15>(id).map(VariantPosition::Longgammon),
+        Variant::Hypergammon => decode_for_position::<3>(id).map(VariantPosition::Hypergammon),
+        Variant::Hypergammon2 => decode_for_position::<2>(id).map(VariantPosition::Hypergammon2),
+        Variant::Hypergammon4 => decode_for_position::<4>(id).map(VariantPosition::Hypergammon4),
+        Variant::Hypergammon5 => decode_for_position::<5>(id).map(VariantPosition::Hypergammon5),
     }
 }
 
-pub fn encode_position<const N: u8>(position: &Position<N>) -> String {
+fn encode_for_position<const N: u8>(position: &Position<N>) -> String {
     let key = encode_key(position);
     let b64 = general_purpose::STANDARD.encode(key);
     b64[..14].to_string()
 }
 
-pub fn decode_position<const N: u8>(id: &str) -> Result<Position<N>, GnuidError> {
+pub fn encode_position<const N: u8>(position: &Position<N>) -> String {
+    encode_for_position(position)
+}
+
+fn decode_for_position<const N: u8>(id: &str) -> Result<Position<N>, GnuidError> {
     let padded_id = format!("{}==", id);
     let key = general_purpose::STANDARD
         .decode(padded_id)
-        .map_err(|_| GnuidError::InvalidBase64)?;
-    let key: [u8; 10] = key.try_into().map_err(|_| GnuidError::InvalidKeyLength)?;
+        .map_err(|_| GnuidError::InvalidPayload)?;
+    let key: [u8; 10] = key
+        .try_into()
+        .map_err(|_| GnuidError::InvalidField("key_length"))?;
     Ok(decode_key(key))
 }
 
-pub fn encode_key<const N: u8>(position: &Position<N>) -> [u8; 10] {
+pub fn decode_position<const N: u8>(id: &str) -> Result<Position<N>, GnuidError> {
+    decode_for_position(id)
+}
+
+fn encode_key<const N: u8>(position: &Position<N>) -> [u8; 10] {
     let mut key = [0u8; 10];
     let mut bit_index = 0;
 
@@ -83,7 +108,7 @@ pub fn encode_key<const N: u8>(position: &Position<N>) -> [u8; 10] {
     key
 }
 
-pub fn decode_key<const N: u8>(key: [u8; 10]) -> Position<N> {
+fn decode_key<const N: u8>(key: [u8; 10]) -> Position<N> {
     let mut bit_index = 0;
     let mut pips = [0i8; 26];
 
@@ -129,7 +154,8 @@ pub fn decode_key<const N: u8>(key: [u8; 10]) -> Position<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode, encode};
+    use super::{decode, encode, GnuidCodec};
+    use crate::codecs::assert_roundtrip;
     use crate::position::Position;
     use crate::Variant;
 
@@ -163,5 +189,6 @@ mod tests {
         let id = encode(variant_position);
         let decoded = decode(Variant::Backgammon, &id).expect("must decode gnuid");
         assert_eq!(encode(decoded), id);
+        assert_roundtrip::<GnuidCodec>(Variant::Backgammon, variant_position);
     }
 }
