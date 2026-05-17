@@ -93,28 +93,27 @@ pub fn decode_board(variant: Variant, board: &str) -> Option<VariantPosition> {
 pub fn parse(input: &str) -> Option<Xgid> {
     let raw = input.trim();
     let payload = raw.strip_prefix("XGID=").unwrap_or(raw);
-    let parts: Vec<&str> = payload.split(':').collect();
-    if parts.len() != 10 {
-        return None;
-    }
-
-    let board = parse_board(parts[0])?;
-    let max_cube = parts[1].parse().ok()?;
-    let match_length = parts[2].parse().ok()?;
-    let rules = parts[3].parse().ok()?;
-    let score_x = parts[4].parse().ok()?;
-    let score_o = parts[5].parse().ok()?;
-    let dice = parse_dice(parts[6])?;
-    let move_flag = match parts[7] {
+    let mut parts = payload.split(':');
+    let board = parse_board(parts.next()?)?;
+    let max_cube = parts.next()?.parse().ok()?;
+    let match_length = parts.next()?.parse().ok()?;
+    let rules = parts.next()?.parse().ok()?;
+    let score_x = parts.next()?.parse().ok()?;
+    let score_o = parts.next()?.parse().ok()?;
+    let dice = parse_dice(parts.next()?)?;
+    let move_flag = match parts.next()? {
         "0" => false,
         "1" => true,
         _ => return None,
     };
-    let cube_owner: i8 = parts[8].parse().ok()?;
+    let cube_owner: i8 = parts.next()?.parse().ok()?;
     if !(-1..=1).contains(&cube_owner) {
         return None;
     }
-    let cube_power = parts[9].parse().ok()?;
+    let cube_power = parts.next()?.parse().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
 
     Some(Xgid {
         board,

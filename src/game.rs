@@ -4,6 +4,16 @@ use crate::position::{GamePhase, GameState};
 use crate::rules::{ClassicRules, VariantRules};
 use crate::variants::{Variant, VariantPosition};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum GameError {
+    #[error("position variant does not match game variant")]
+    VariantMismatch,
+    #[error("legal move index out of bounds")]
+    LegalMoveIndexOutOfBounds,
+    #[error("policy returned out-of-bounds legal move index")]
+    PolicyIndexOutOfBounds,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Game {
     variant: Variant,
@@ -26,9 +36,9 @@ impl Game {
         self.position
     }
 
-    pub fn set_position(&mut self, position: VariantPosition) -> Result<(), &'static str> {
+    pub fn set_position(&mut self, position: VariantPosition) -> Result<(), GameError> {
         if position.variant() != self.variant {
-            return Err("position variant does not match game variant");
+            return Err(GameError::VariantMismatch);
         }
         self.position = position;
         Ok(())
@@ -46,11 +56,7 @@ impl Game {
         R::legal_positions(self.position, dice)
     }
 
-    pub fn apply_nth_legal_position(
-        &mut self,
-        dice: &Dice,
-        index: usize,
-    ) -> Result<(), &'static str> {
+    pub fn apply_nth_legal_position(&mut self, dice: &Dice, index: usize) -> Result<(), GameError> {
         self.apply_nth_legal_position_with::<ClassicRules>(dice, index)
     }
 
@@ -58,10 +64,10 @@ impl Game {
         &mut self,
         dice: &Dice,
         index: usize,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), GameError> {
         let legal = self.legal_positions_with::<R>(dice);
         if index >= legal.len() {
-            return Err("legal move index out of bounds");
+            return Err(GameError::LegalMoveIndexOutOfBounds);
         }
         self.position = legal[index];
         Ok(())
@@ -80,7 +86,7 @@ impl Game {
         dice_gen: &mut D,
         max_plies: usize,
         mut pick_index: P,
-    ) -> Result<usize, &'static str>
+    ) -> Result<usize, GameError>
     where
         P: FnMut(VariantPosition, &Dice, &[VariantPosition]) -> usize,
     {
@@ -98,7 +104,7 @@ impl Game {
 
             let index = pick_index(self.position, &dice, &legal);
             if index >= legal.len() {
-                return Err("policy returned out-of-bounds legal move index");
+                return Err(GameError::PolicyIndexOutOfBounds);
             }
 
             self.position = legal[index];
@@ -115,7 +121,7 @@ impl Game {
         dice_gen: &mut D,
         max_plies: usize,
         pick_index: P,
-    ) -> Result<usize, &'static str>
+    ) -> Result<usize, GameError>
     where
         P: FnMut(VariantPosition, &Dice, &[VariantPosition]) -> usize,
     {
@@ -125,7 +131,7 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-    use super::Game;
+    use super::{Game, GameError};
     use crate::dice::Dice;
     use crate::dice_gen::DiceGenMock;
     use crate::rules::ClassicRules;
@@ -152,6 +158,6 @@ mod tests {
             .play_episode_with::<ClassicRules, _, _>(&mut dice, 1, |_pos, _dice, legal| legal.len())
             .unwrap_err();
 
-        assert_eq!(err, "policy returned out-of-bounds legal move index");
+        assert_eq!(err, GameError::PolicyIndexOutOfBounds);
     }
 }

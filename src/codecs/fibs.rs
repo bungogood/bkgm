@@ -90,13 +90,14 @@ pub fn decode_board_for_position<const N: u8>(text: &str) -> Option<Position<N>>
     pips[25] = x_bar as i8;
     pips[0] = -(o_bar as i8);
 
-    let tokens: Vec<&str> = points.split(',').collect();
-    if tokens.len() != 24 {
-        return None;
-    }
-    for (idx, token) in tokens.iter().enumerate() {
+    let mut tokens = points.split(',');
+    for idx in 0..24 {
+        let token = tokens.next()?;
         let pip = 24 - idx;
         pips[pip] = parse_point_token(token.trim())?;
+    }
+    if tokens.next().is_some() {
+        return None;
     }
 
     let mut position = Position::<N>::try_from(pips).ok()?;
@@ -118,7 +119,7 @@ pub fn normalize_move(text: &str) -> Option<String> {
 pub fn legal_moves(
     position: VariantPosition,
     dice: Dice,
-) -> Result<Vec<(String, VariantPosition)>, String> {
+) -> crate::codecs::move_text::MoveTextResult<Vec<(String, VariantPosition)>> {
     crate::codecs::move_text::legal(position, dice)
 }
 
@@ -126,7 +127,7 @@ pub fn encode_move(
     position: VariantPosition,
     next_position: VariantPosition,
     dice: Dice,
-) -> Result<String, String> {
+) -> crate::codecs::move_text::MoveTextResult<String> {
     crate::codecs::move_text::encode(position, next_position, dice)
 }
 

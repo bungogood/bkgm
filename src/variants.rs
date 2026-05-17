@@ -1,3 +1,4 @@
+use crate::codecs::move_text::MoveTextResult;
 use crate::dice::Dice;
 use crate::position::Position;
 use crate::position::{GamePhase, GameState, State};
@@ -182,11 +183,11 @@ impl VariantPosition {
         }
     }
 
-    pub fn legal_moves(self, dice: Dice) -> Result<Vec<(String, VariantPosition)>, String> {
+    pub fn legal_moves(self, dice: Dice) -> MoveTextResult<Vec<(String, VariantPosition)>> {
         crate::codecs::move_text::legal(self, dice)
     }
 
-    pub fn encode_move(self, next: VariantPosition, dice: Dice) -> Result<String, String> {
+    pub fn encode_move(self, next: VariantPosition, dice: Dice) -> MoveTextResult<String> {
         crate::codecs::move_text::encode(self, next, dice)
     }
 

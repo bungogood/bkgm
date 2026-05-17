@@ -1,5 +1,13 @@
 use std::collections::BTreeMap;
 
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum EngineSpecError {
+    #[error("invalid engine spec '{0}'")]
+    InvalidSpec(String),
+    #[error("invalid engine override '{part}' in '{spec}'")]
+    InvalidOverride { part: String, spec: String },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EngineSpec {
     pub alias: String,
@@ -7,14 +15,14 @@ pub struct EngineSpec {
     pub options: BTreeMap<String, String>,
 }
 
-pub fn parse_engine_spec(spec: &str) -> Result<EngineSpec, String> {
+pub fn parse_engine_spec(spec: &str) -> Result<EngineSpec, EngineSpecError> {
     let (head, overrides_raw) = match spec.split_once(':') {
         Some((a, b)) => (a.trim(), Some(b.trim())),
         None => (spec.trim(), None),
     };
     let (alias, version) = parse_alias_version(head);
     if alias.is_empty() {
-        return Err(format!("invalid engine spec '{spec}'"));
+        return Err(EngineSpecError::InvalidSpec(spec.to_string()));
     }
     let mut options = BTreeMap::new();
     if let Some(raw) = overrides_raw {
@@ -26,7 +34,10 @@ pub fn parse_engine_spec(spec: &str) -> Result<EngineSpec, String> {
                 }
                 let (k, v) = p
                     .split_once('=')
-                    .ok_or_else(|| format!("invalid engine override '{p}' in '{spec}'"))?;
+                    .ok_or_else(|| EngineSpecError::InvalidOverride {
+                        part: p.to_string(),
+                        spec: spec.to_string(),
+                    })?;
                 let key = if k.trim().starts_with("engine.") {
                     k.trim().to_string()
                 } else {

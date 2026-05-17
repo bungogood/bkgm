@@ -3,6 +3,16 @@ use crate::rules::{legal_positions_with, ClassicRules};
 use crate::{Position, State, VariantPosition};
 use std::collections::{HashMap, HashSet};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum MoveTextError {
+    #[error("variant mismatch while encoding move")]
+    VariantMismatch,
+    #[error("failed to derive move text from legal child")]
+    EncodeTargetNotReachable,
+}
+
+pub type MoveTextResult<T> = Result<T, MoveTextError>;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MoveStep {
     pub from: usize,
@@ -12,7 +22,7 @@ pub struct MoveStep {
 pub fn legal_steps(
     position: VariantPosition,
     dice: Dice,
-) -> Result<Vec<(Vec<MoveStep>, VariantPosition)>, String> {
+) -> MoveTextResult<Vec<(Vec<MoveStep>, VariantPosition)>> {
     match position {
         VariantPosition::Backgammon(p) => legal_for_steps(p, dice, VariantPosition::Backgammon),
         VariantPosition::Nackgammon(p) => legal_for_steps(p, dice, VariantPosition::Nackgammon),
@@ -27,7 +37,7 @@ pub fn legal_steps(
 pub fn legal(
     position: VariantPosition,
     dice: Dice,
-) -> Result<Vec<(String, VariantPosition)>, String> {
+) -> MoveTextResult<Vec<(String, VariantPosition)>> {
     let with_steps = legal_steps(position, dice)?;
     Ok(with_steps
         .into_iter()
@@ -39,7 +49,7 @@ pub fn encode(
     position: VariantPosition,
     next_position: VariantPosition,
     dice: Dice,
-) -> Result<String, String> {
+) -> MoveTextResult<String> {
     let steps = encode_steps(position, next_position, dice)?;
     Ok(format_move_steps(&steps))
 }
@@ -48,7 +58,7 @@ pub fn encode_steps(
     position: VariantPosition,
     next_position: VariantPosition,
     dice: Dice,
-) -> Result<Vec<MoveStep>, String> {
+) -> MoveTextResult<Vec<MoveStep>> {
     match (position, next_position) {
         (VariantPosition::Backgammon(start), VariantPosition::Backgammon(next)) => {
             encode_for(start, next, dice)
@@ -71,7 +81,7 @@ pub fn encode_steps(
         (VariantPosition::Hypergammon5(start), VariantPosition::Hypergammon5(next)) => {
             encode_for(start, next, dice)
         }
-        _ => Err("variant mismatch while encoding move".to_string()),
+        _ => Err(MoveTextError::VariantMismatch),
     }
 }
 
@@ -79,18 +89,24 @@ fn encode_for<const N: u8>(
     start: Position<N>,
     next: Position<N>,
     dice: Dice,
-) -> Result<Vec<MoveStep>, String> {
+) -> MoveTextResult<Vec<MoveStep>> {
     let target_after_steps = next.flip();
-    let mut steps = Vec::new();
-
-    for order in die_orders(dice) {
+    let mut steps = Vec::with_capacity(4);
+    let mut out: Option<Vec<MoveStep>> = None;
+    for_each_die_order(dice, |order| {
         steps.clear();
-        if find_steps_for_target(start, &order, 0, target_after_steps, &mut steps) {
-            return Ok(steps.clone());
+        if find_steps_for_target(start, order, 0, target_after_steps, &mut steps) {
+            out = Some(steps.clone());
+            true
+        } else {
+            false
         }
+    });
+    if let Some(found) = out {
+        return Ok(found);
     }
 
-    Err("failed to derive move text from legal child".to_string())
+    Err(MoveTextError::EncodeTargetNotReachable)
 }
 
 fn find_steps_for_target<const N: u8>(
@@ -173,24 +189,25 @@ fn legal_for_steps<const N: u8>(
     start: Position<N>,
     dice: Dice,
     wrap: fn(Position<N>) -> VariantPosition,
-) -> Result<Vec<(Vec<MoveStep>, VariantPosition)>, String> {
+) -> MoveTextResult<Vec<(Vec<MoveStep>, VariantPosition)>> {
     let legal = legal_positions_with::<ClassicRules, N>(start, &dice);
     let legal_set: HashSet<Position<N>> = legal.iter().copied().collect();
     let mut move_by_child: HashMap<Position<N>, Vec<MoveStep>> = HashMap::new();
 
-    for order in die_orders(dice) {
-        let mut steps = Vec::new();
-        collect_paths(start, &order, 0, &mut steps, &legal_set, &mut move_by_child);
-        let mut steps_flipped = Vec::new();
+    for_each_die_order(dice, |order| {
+        let mut steps = Vec::with_capacity(4);
+        collect_paths(start, order, 0, &mut steps, &legal_set, &mut move_by_child);
+        let mut steps_flipped = Vec::with_capacity(4);
         collect_paths(
             start.flip(),
-            &order,
+            order,
             0,
             &mut steps_flipped,
             &legal_set,
             &mut move_by_child,
         );
-    }
+        false
+    });
 
     let mut out = Vec::with_capacity(legal.len());
     for child in legal {
@@ -385,10 +402,23 @@ fn point_to_text(point: usize) -> String {
     }
 }
 
-fn die_orders(dice: Dice) -> Vec<Vec<usize>> {
+fn for_each_die_order<F>(dice: Dice, mut f: F)
+where
+    F: FnMut(&[usize]) -> bool,
+{
     match dice {
-        Dice::Double(d) => vec![vec![d, d, d, d]],
-        Dice::Mixed(m) => vec![vec![m.big(), m.small()], vec![m.small(), m.big()]],
+        Dice::Double(d) => {
+            let order = [d, d, d, d];
+            let _ = f(&order);
+        }
+        Dice::Mixed(m) => {
+            let big_small = [m.big(), m.small()];
+            if f(&big_small) {
+                return;
+            }
+            let small_big = [m.small(), m.big()];
+            let _ = f(&small_big);
+        }
     }
 }
 
