@@ -3,10 +3,10 @@ use crate::rules::{legal_positions_with, ClassicRules};
 use crate::{Position, State, VariantPosition};
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone, Copy)]
-struct Step {
-    from: usize,
-    to: usize,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MoveStep {
+    pub from: usize,
+    pub to: usize,
 }
 
 pub fn legal(
@@ -29,6 +29,15 @@ pub fn encode(
     next_position: VariantPosition,
     dice: Dice,
 ) -> Result<String, String> {
+    let steps = encode_steps(position, next_position, dice)?;
+    Ok(format_move_steps(&steps))
+}
+
+pub fn encode_steps(
+    position: VariantPosition,
+    next_position: VariantPosition,
+    dice: Dice,
+) -> Result<Vec<MoveStep>, String> {
     match (position, next_position) {
         (VariantPosition::Backgammon(start), VariantPosition::Backgammon(next)) => {
             encode_for(start, next, dice)
@@ -59,14 +68,14 @@ fn encode_for<const N: u8>(
     start: Position<N>,
     next: Position<N>,
     dice: Dice,
-) -> Result<String, String> {
+) -> Result<Vec<MoveStep>, String> {
     let target_after_steps = next.flip();
     let mut steps = Vec::new();
 
     for order in die_orders(dice) {
         steps.clear();
         if find_steps_for_target(start, &order, 0, target_after_steps, &mut steps) {
-            return Ok(format_steps(&steps));
+            return Ok(steps.clone());
         }
     }
 
@@ -78,7 +87,7 @@ fn find_steps_for_target<const N: u8>(
     order: &[usize],
     die_idx: usize,
     target: Position<N>,
-    steps: &mut Vec<Step>,
+    steps: &mut Vec<MoveStep>,
 ) -> bool {
     if die_idx == order.len() {
         return current == target;
@@ -90,7 +99,7 @@ fn find_steps_for_target<const N: u8>(
         if let Some(next) = current.try_move_single_checker(from, die) {
             moved_any = true;
             let to = from.saturating_sub(die);
-            steps.push(Step { from, to });
+            steps.push(MoveStep { from, to });
             if find_steps_for_target(next, order, die_idx + 1, target, steps) {
                 return true;
             }
@@ -183,7 +192,7 @@ fn legal_for<const N: u8>(
 
 fn apply_for<const N: u8>(position: Position<N>, dice: Dice, text: &str) -> Option<Position<N>> {
     let normalized = normalize(text)?;
-    let steps = parse_steps(&normalized)?;
+    let steps = parse_move_steps(&normalized)?;
     let mut remaining = match dice {
         Dice::Double(d) => vec![d, d, d, d],
         Dice::Mixed(m) => vec![m.big(), m.small()],
@@ -197,7 +206,7 @@ fn apply_for<const N: u8>(position: Position<N>, dice: Dice, text: &str) -> Opti
 
 fn apply_steps<const N: u8>(
     current: Position<N>,
-    steps: &[Step],
+    steps: &[MoveStep],
     remaining: &mut Vec<usize>,
 ) -> Option<Position<N>> {
     if steps.is_empty() {
@@ -220,7 +229,7 @@ fn apply_steps<const N: u8>(
     None
 }
 
-fn step_matches_die(step: Step, die: usize) -> bool {
+fn step_matches_die(step: MoveStep, die: usize) -> bool {
     if step.to == 0 {
         step.from <= die
     } else {
@@ -228,7 +237,7 @@ fn step_matches_die(step: Step, die: usize) -> bool {
     }
 }
 
-fn parse_steps(text: &str) -> Option<Vec<Step>> {
+pub fn parse_move_steps(text: &str) -> Option<Vec<MoveStep>> {
     if text.trim().eq_ignore_ascii_case("pass") {
         return Some(Vec::new());
     }
@@ -238,7 +247,7 @@ fn parse_steps(text: &str) -> Option<Vec<Step>> {
         if parts.len() != 2 {
             return None;
         }
-        steps.push(Step {
+        steps.push(MoveStep {
             from: parse_from_point(parts[0])?,
             to: parse_to_point(parts[1])?,
         });
@@ -254,18 +263,18 @@ fn collect_paths<const N: u8>(
     current: Position<N>,
     order: &[usize],
     die_idx: usize,
-    steps: &mut Vec<Step>,
+    steps: &mut Vec<MoveStep>,
     legal_set: &HashSet<Position<N>>,
     move_by_child: &mut HashMap<Position<N>, String>,
 ) {
     if die_idx == order.len() {
         let child = current.flip();
         if legal_set.contains(&child) {
-            let mv = format_steps(steps);
+            let mv = format_move_steps(steps);
             move_by_child.entry(child).or_insert(mv);
         }
         if legal_set.contains(&current) {
-            let mv = format_steps(steps);
+            let mv = format_move_steps(steps);
             move_by_child.entry(current).or_insert(mv);
         }
         return;
@@ -277,7 +286,7 @@ fn collect_paths<const N: u8>(
         if let Some(next) = current.try_move_single_checker(from, die) {
             found_any = true;
             let to = from.saturating_sub(die);
-            steps.push(Step { from, to });
+            steps.push(MoveStep { from, to });
             collect_paths(next, order, die_idx + 1, steps, legal_set, move_by_child);
             steps.pop();
         }
@@ -287,7 +296,7 @@ fn collect_paths<const N: u8>(
     }
 }
 
-fn format_steps(steps: &[Step]) -> String {
+pub fn format_move_steps(steps: &[MoveStep]) -> String {
     if steps.is_empty() {
         return "pass".to_string();
     }
